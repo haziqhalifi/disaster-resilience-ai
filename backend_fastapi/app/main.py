@@ -7,7 +7,7 @@ Run with:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.endpoints import alerts, auth
+from app.api.v1.endpoints import alerts, auth, devices, warnings
 
 app = FastAPI(
     title="Disaster Resilience AI API",
@@ -28,6 +28,8 @@ app.add_middleware(
 
 app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["alerts"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(warnings.router, prefix="/api/v1/warnings", tags=["warnings"])
+app.include_router(devices.router, prefix="/api/v1/devices", tags=["devices"])
 
 
 @app.get("/", tags=["health"])
