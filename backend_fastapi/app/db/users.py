@@ -1,12 +1,14 @@
-"""In-memory user store.
+"""User store backed by Supabase (table: ``users``).
 
-NOTE: Data is lost on server restart.
-      Replace with a real database (e.g. SQLAlchemy + PostgreSQL/SQLite)
-      for any production deployment.
+Expected table schema — run the SQL migration in ``docs/supabase_migrations.sql``.
 """
+
+from __future__ import annotations
 
 import uuid
 from typing import TypedDict
+
+from app.db.supabase_client import get_client
 
 
 class UserRecord(TypedDict):
@@ -16,31 +18,44 @@ class UserRecord(TypedDict):
     hashed_password: str
 
 
-# Keyed by email (lower-cased) for O(1) look-ups during sign-in.
-_users_by_email: dict[str, UserRecord] = {}
-
-# Secondary index keyed by username for uniqueness checks.
-_users_by_username: dict[str, UserRecord] = {}
-
-
 # ── CRUD helpers ──────────────────────────────────────────────────────────────
 
 def get_user_by_email(email: str) -> UserRecord | None:
-    return _users_by_email.get(email.lower())
+    sb = get_client()
+    res = (
+        sb.table("users")
+        .select("id, username, email, hashed_password")
+        .eq("email", email.lower())
+        .limit(1)
+        .execute()
+    )
+    if res.data:
+        return res.data[0]
+    return None
 
 
 def get_user_by_username(username: str) -> UserRecord | None:
-    return _users_by_username.get(username.lower())
+    sb = get_client()
+    res = (
+        sb.table("users")
+        .select("id, username, email, hashed_password")
+        .eq("username", username.lower())
+        .limit(1)
+        .execute()
+    )
+    if res.data:
+        return res.data[0]
+    return None
 
 
 def create_user(username: str, email: str, hashed_password: str) -> UserRecord:
-    """Insert a new user record and return it."""
-    record: UserRecord = {
+    """Insert a new user row and return it."""
+    sb = get_client()
+    row = {
         "id": str(uuid.uuid4()),
         "username": username,
         "email": email.lower(),
         "hashed_password": hashed_password,
     }
-    _users_by_email[record["email"]] = record
-    _users_by_username[username.lower()] = record
-    return record
+    res = sb.table("users").insert(row).execute()
+    return res.data[0]

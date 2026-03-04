@@ -6,6 +6,13 @@ In production, set DISASTER_SECRET_KEY to a cryptographically random string:
 """
 
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load .env from the backend_fastapi directory
+_env_path = Path(__file__).resolve().parents[2] / ".env"
+load_dotenv(_env_path)
 
 # Secret key used to sign JWT tokens.
 # CHANGE THIS in production — keep it in an environment variable.
