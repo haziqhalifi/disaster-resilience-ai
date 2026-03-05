@@ -38,6 +38,9 @@ dependencies:
   # HTTP client for calling the FastAPI backend
   http: ^1.2.0
 
+  # Local key-value storage for persisted login session
+  shared_preferences: ^2.3.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

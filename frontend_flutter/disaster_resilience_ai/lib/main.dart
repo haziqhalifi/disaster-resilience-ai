@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:disaster_resilience_ai/ui/home_page.dart';
+import 'package:disaster_resilience_ai/ui/auth_page.dart';
 
 void main() {
   runApp(const DisasterResilienceApp());
@@ -13,11 +13,8 @@ class DisasterResilienceApp extends StatelessWidget {
     return MaterialApp(
       title: 'Disaster Resilience AI',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorSchemeSeed: Colors.deepOrange,
-        useMaterial3: true,
-      ),
-      home: const HomePage(),
+      theme: ThemeData(colorSchemeSeed: Colors.deepOrange, useMaterial3: true),
+      home: const AuthPage(),
     );
   }
 }
