@@ -45,7 +45,7 @@ python -m venv venv
 # Windows
 venv\Scripts\activate
 # macOS/Linux
-source venv/bin/activate
+venv\Scripts\activate
 
 # Install dependencies (includes ai_models as editable local package)
 pip install -r requirements.txt
