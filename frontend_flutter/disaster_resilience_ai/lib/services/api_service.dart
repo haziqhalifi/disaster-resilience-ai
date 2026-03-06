@@ -254,4 +254,37 @@ class ApiService {
     }
     throw Exception('Failed to fetch map data: ${response.statusCode}');
   }
+
+  /// Fetch real-world road routing between two points using OSRM (Open Source Routing Machine).
+  /// Returns a list of LatLng coordinates.
+  Future<List<Map<String, double>>> fetchRoute({
+    required double startLat,
+    required double startLon,
+    required double endLat,
+    required double endLon,
+  }) async {
+    // Public OSRM API (no key required for low volume)
+    final url = 'https://router.project-osrm.org/route/v1/driving/'
+        '$startLon,$startLat;$endLon,$endLat?overview=full&geometries=geojson';
+
+    try {
+      final response = await _client.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final routes = data['routes'] as List;
+        if (routes.isNotEmpty) {
+          final geometry = routes[0]['geometry']['coordinates'] as List;
+          return geometry.map((point) {
+            return {
+              'lat': (point[1] as num).toDouble(),
+              'lng': (point[0] as num).toDouble(),
+            };
+          }).toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
 }

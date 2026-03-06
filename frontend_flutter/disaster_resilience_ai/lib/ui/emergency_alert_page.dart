@@ -7,6 +7,7 @@ import 'dart:math';
 import 'package:disaster_resilience_ai/models/warning_model.dart';
 import 'package:disaster_resilience_ai/models/risk_map_model.dart';
 import 'package:disaster_resilience_ai/services/api_service.dart';
+import 'package:disaster_resilience_ai/ui/evacuation_navigation_page.dart';
 
 class EmergencyAlertPage extends StatefulWidget {
   const EmergencyAlertPage({super.key, this.warning});
@@ -25,6 +26,7 @@ class _EmergencyAlertPageState extends State<EmergencyAlertPage> {
   LatLng? _userLocation;
   bool _loading = true;
   EvacuationCentre? _nearestCentre;
+  List<LatLng> _routePoints = [];
 
   @override
   void initState() {
@@ -60,11 +62,24 @@ class _EmergencyAlertPageState extends State<EmergencyAlertPage> {
         }
       }
 
+      // 4. Fetch real road route to nearest centre
+      List<LatLng> route = [];
+      if (nearest != null) {
+        final routeData = await _api.fetchRoute(
+          startLat: userLatLng.latitude,
+          startLon: userLatLng.longitude,
+          endLat: nearest.latitude,
+          endLon: nearest.longitude,
+        );
+        route = routeData.map((p) => LatLng(p['lat']!, p['lng']!)).toList();
+      }
+
       if (mounted) {
         setState(() {
           _userLocation = userLatLng;
           _mapData = mapData;
           _nearestCentre = nearest;
+          _routePoints = route;
           _loading = false;
         });
       }
@@ -242,6 +257,17 @@ class _EmergencyAlertPageState extends State<EmergencyAlertPage> {
                           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                           userAgentPackageName: 'com.disaster.resilience.ai',
                         ),
+                        // Real-world road route
+                        if (_routePoints.isNotEmpty)
+                          PolylineLayer(
+                            polylines: [
+                              Polyline(
+                                points: _routePoints,
+                                color: Colors.blue[600]!,
+                                strokeWidth: 4,
+                              ),
+                            ],
+                          ),
                         // Warning Circle
                         CircleLayer(
                           circles: [
@@ -358,7 +384,18 @@ class _EmergencyAlertPageState extends State<EmergencyAlertPage> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    if (_userLocation != null) {
+                    if (_userLocation != null && _nearestCentre != null && _routePoints.isNotEmpty) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EvacuationNavigationPage(
+                            routePoints: _routePoints,
+                            userLocation: _userLocation!,
+                            destination: _nearestCentre!,
+                          ),
+                        ),
+                      );
+                    } else if (_userLocation != null) {
                       _mapController.move(_userLocation!, 15);
                     }
                   },
