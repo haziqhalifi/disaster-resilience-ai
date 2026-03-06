@@ -648,6 +648,7 @@ class _HomePageState extends State<HomePage> {
         return const MapTab();
       case 3:
         return ProfileTab(
+          accessToken: widget.accessToken,
           username: widget.username,
           email: widget.email,
           onLogout: _logout,

@@ -19,7 +19,6 @@ class _MapTabState extends State<MapTab> {
 
   // ── State ─────────────────────────────────────────────────────────────────
   bool _loadingMap = true;
-  String? _mapError;
   MapData? _mapData;
 
   LatLng? _userLocation;
@@ -54,7 +53,6 @@ class _MapTabState extends State<MapTab> {
   Future<void> _loadMapData() async {
     setState(() {
       _loadingMap = true;
-      _mapError = null;
     });
     try {
       final json = await _api.fetchMapData(hazardType: _hazardFilter);
@@ -67,7 +65,6 @@ class _MapTabState extends State<MapTab> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _mapError = e.toString().replaceFirst('Exception: ', '');
           _loadingMap = false;
         });
       }

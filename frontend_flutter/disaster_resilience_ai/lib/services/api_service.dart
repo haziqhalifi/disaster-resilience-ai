@@ -287,4 +287,37 @@ class ApiService {
       return [];
     }
   }
+
+  // ── User Profile & Emergency Info ───────────────────────────────────────
+
+  /// Fetch the current user's profile information.
+  Future<Map<String, dynamic>> fetchProfile(String accessToken) async {
+    final response = await _client.get(
+      Uri.parse('$baseUrl/api/v1/profile/me'),
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
+  /// Update the current user's profile / emergency info.
+  Future<Map<String, dynamic>> updateProfile({
+    required String accessToken,
+    required Map<String, dynamic> profileData,
+  }) async {
+    final response = await _client.put(
+      Uri.parse('$baseUrl/api/v1/profile/me'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode(profileData),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
 }

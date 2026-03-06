@@ -22,7 +22,6 @@ class _EmergencyAlertPageState extends State<EmergencyAlertPage> {
   final ApiService _api = ApiService();
   final MapController _mapController = MapController();
 
-  MapData? _mapData;
   LatLng? _userLocation;
   bool _loading = true;
   EvacuationCentre? _nearestCentre;
@@ -77,7 +76,6 @@ class _EmergencyAlertPageState extends State<EmergencyAlertPage> {
       if (mounted) {
         setState(() {
           _userLocation = userLatLng;
-          _mapData = mapData;
           _nearestCentre = nearest;
           _routePoints = route;
           _loading = false;
