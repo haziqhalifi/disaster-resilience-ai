@@ -16,9 +16,7 @@ from app.db.warnings import create_warning
 SAMPLE_WARNINGS = [
     {
         "title": "Flood Warning: Kg. Banjir",
-        "description": "Water levels rising rapidly at Sungai Lembing. Current level at 2.5m, "
-                       "approaching danger threshold. Immediate evacuation recommended for "
-                       "low-lying areas. Follow the green path to higher ground.",
+        "description": "Water levels rising rapidly at Sungai Lembing. Current level at 2.5m.",
         "hazard_type": "flood",
         "alert_level": "warning",
         "latitude": 3.8100,
@@ -27,40 +25,49 @@ SAMPLE_WARNINGS = [
         "source": "MET Malaysia",
     },
     {
-        "title": "Landslide Risk: Bukit Fraser",
-        "description": "Soil erosion detected near hillside settlement area after heavy "
-                       "rainfall. Ground instability increasing. Residents within 2km radius "
-                       "should prepare for possible evacuation.",
-        "hazard_type": "landslide",
-        "alert_level": "observe",
-        "latitude": 3.7200,
-        "longitude": 101.7300,
-        "radius_km": 3.0,
-        "source": "JKR Malaysia",
-    },
-    {
-        "title": "Flash Flood Alert: Kuantan Town",
-        "description": "Heavy rainfall expected in the next 6 hours. Flash flood advisory "
-                       "issued for Kuantan town centre and surrounding kampung areas. "
-                       "Avoid low-lying roads.",
-        "hazard_type": "flood",
+        "title": "Dengkil: Heavy Rain Forecast",
+        "description": "Weather forecast indicates 80% chance of heavy precipitation in Dengkil district "
+                       "over the next 3 hours. Residents near Sungai Langat should monitor water levels. "
+                       "Potential for minor flash floods in Salak Tinggi areas.",
+        "hazard_type": "forecast",
         "alert_level": "advisory",
-        "latitude": 3.8077,
-        "longitude": 103.3260,
-        "radius_km": 10.0,
-        "source": "NADMA",
+        "latitude": 2.8590,
+        "longitude": 101.6780,
+        "radius_km": 15.0,
+        "source": "MET Malaysia",
     },
     {
-        "title": "EVACUATE: Sungai Pahang Overflow",
-        "description": "Sungai Pahang has breached its banks at KM 12. Water level is 4.2m "
-                       "and rising. ALL residents within 8km must evacuate to designated "
-                       "relief centres IMMEDIATELY. Nearest safe zone: Dewan Komuniti "
-                       "Bukit Pelindung.",
+        "title": "AID: Food & Supply Distribution",
+        "description": "Social Welfare Dept (JKM) is distributing dry food parcels and hygiene kits "
+                       "at PPS SJK(C) Dengkil. Available for all affected residents from 2pm to 6pm today.",
+        "hazard_type": "aid",
+        "alert_level": "advisory",
+        "latitude": 2.8590,
+        "longitude": 101.6780,
+        "radius_km": 5.0,
+        "source": "JKM Malaysia",
+    },
+    {
+        "title": "INFRA: Road Closure Alert",
+        "description": "The bridge connecting Dengkil to Salak Tinggi is currently closed to all vehicles "
+                       "due to rising water levels. Please use alternative route via Cyberjaya.",
+        "hazard_type": "infrastructure",
+        "alert_level": "warning",
+        "latitude": 2.8450,
+        "longitude": 101.6950,
+        "radius_km": 2.0,
+        "source": "LLM Malaysia",
+    },
+    {
+        "title": "Observe: Sg. Langat Water Level",
+        "description": "Sungai Langat at Dengkil bridge has reached Warning Level (5.1m). "
+                       "BOMBA monitoring team is on-site. Low-lying areas in Kg. Ampar Tenang "
+                       "are advised to move valuables to higher ground.",
         "hazard_type": "flood",
-        "alert_level": "evacuate",
-        "latitude": 3.8050,
-        "longitude": 103.3200,
-        "radius_km": 8.0,
+        "alert_level": "observe",
+        "latitude": 2.8620,
+        "longitude": 101.6850,
+        "radius_km": 4.0,
         "source": "DID Malaysia",
     },
 ]

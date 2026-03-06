@@ -208,7 +208,7 @@ class _EmergencyAlertPageState extends State<EmergencyAlertPage> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(color: Colors.white.withAlpha(51), shape: BoxShape.circle),
-                child: Icon(_alertIcon(w.alertLevel), color: Colors.white, size: 60),
+                child: Icon(_alertIcon(w), color: Colors.white, size: 60),
               ),
               const SizedBox(height: 16),
               Text(
@@ -449,8 +449,13 @@ class _EmergencyAlertPageState extends State<EmergencyAlertPage> {
     }
   }
 
-  IconData _alertIcon(AlertLevel level) {
-    switch (level) {
+  IconData _alertIcon(Warning w) {
+    // Priority icons for non-standard hazard types
+    if (w.hazardType == HazardType.aid) return Icons.volunteer_activism;
+    if (w.hazardType == HazardType.forecast) return Icons.wb_cloudy_outlined;
+    if (w.hazardType == HazardType.infrastructure) return Icons.construction;
+
+    switch (w.alertLevel) {
       case AlertLevel.advisory: return Icons.info_outline;
       case AlertLevel.observe: return Icons.visibility_outlined;
       case AlertLevel.warning: return Icons.warning_amber_rounded;

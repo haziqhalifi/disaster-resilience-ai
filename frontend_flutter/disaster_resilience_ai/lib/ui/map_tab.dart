@@ -88,6 +88,7 @@ class _MapTabState extends State<MapTab> {
           _userLocation = LatLng(pos.latitude, pos.longitude);
           _locatingUser = false;
         });
+        _mapController.move(_userLocation!, 13.0);
       }
     } catch (_) {
       // Fallback to default

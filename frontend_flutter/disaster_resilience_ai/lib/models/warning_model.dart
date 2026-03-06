@@ -25,7 +25,10 @@ enum HazardType {
   flood,
   landslide,
   typhoon,
-  earthquake;
+  earthquake,
+  forecast,
+  aid,
+  infrastructure;
 
   String get displayName {
     switch (this) {
@@ -37,6 +40,12 @@ enum HazardType {
         return 'Typhoon';
       case HazardType.earthquake:
         return 'Earthquake';
+      case HazardType.forecast:
+        return 'Forecast';
+      case HazardType.aid:
+        return 'Aid Distribution';
+      case HazardType.infrastructure:
+        return 'Infrastructure';
     }
   }
 }
