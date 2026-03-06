@@ -142,3 +142,24 @@ CREATE POLICY "Service role full access" ON public.evacuation_centres
 
 CREATE POLICY "Service role full access" ON public.evacuation_routes
     FOR ALL USING (true) WITH CHECK (true);
+
+
+-- ── 7. User Profiles (Emergency & Personal Info) ──────────────────────────
+
+CREATE TABLE IF NOT EXISTS public.user_profiles (
+    user_id                        TEXT PRIMARY KEY REFERENCES public.users(id) ON DELETE CASCADE,
+    full_name                      TEXT,
+    phone_number                   TEXT,
+    blood_type                     TEXT,
+    allergies                      TEXT NOT NULL DEFAULT '',
+    medical_conditions             TEXT NOT NULL DEFAULT '',
+    emergency_contact_name         TEXT,
+    emergency_contact_relationship TEXT,
+    emergency_contact_phone        TEXT,
+    updated_at                     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Service role full access" ON public.user_profiles
+    FOR ALL USING (true) WITH CHECK (true);
