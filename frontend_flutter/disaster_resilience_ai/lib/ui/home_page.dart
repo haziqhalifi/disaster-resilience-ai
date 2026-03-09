@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:disaster_resilience_ai/models/warning_model.dart';
@@ -18,6 +20,8 @@ import 'package:disaster_resilience_ai/ui/chatbot_page.dart';
 import 'package:disaster_resilience_ai/models/disaster_news_model.dart';
 import 'package:disaster_resilience_ai/ui/all_warnings_page.dart';
 import 'package:disaster_resilience_ai/ui/all_news_page.dart';
+import 'package:disaster_resilience_ai/services/notification_service.dart';
+import 'package:disaster_resilience_ai/ui/incoming_alert_page.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -56,11 +60,18 @@ class _HomePageState extends State<HomePage> {
   double _userLat = 3.8077;
   double _userLon = 103.3260;
   String _locationLabel = 'Locating...';
+  Timer? _liveLocationTimer;
 
   @override
   void initState() {
     super.initState();
     _determineLocation();
+  }
+
+  @override
+  void dispose() {
+    _liveLocationTimer?.cancel();
+    super.dispose();
   }
 
   /// Fetch the device's real GPS location, then kick off data fetches.
@@ -100,6 +111,75 @@ class _HomePageState extends State<HomePage> {
     _fetchWarnings();
     _updateBackendLocation();
     _fetchWeather();
+    _startNotificationPolling();
+    _startLiveLocationSync();
+  }
+
+  /// Keep uploading user's location while app is open so family members
+  /// can view near real-time movement.
+  void _startLiveLocationSync() {
+    _liveLocationTimer?.cancel();
+    _liveLocationTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+      try {
+        final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (!serviceEnabled) return;
+
+        final permission = await Geolocator.checkPermission();
+        if (permission != LocationPermission.always &&
+            permission != LocationPermission.whileInUse) {
+          return;
+        }
+
+        final position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+          ),
+        ).timeout(const Duration(seconds: 8));
+
+        if (!mounted) return;
+        setState(() {
+          _userLat = position.latitude;
+          _userLon = position.longitude;
+          _locationLabel =
+              '${position.latitude.toStringAsFixed(4)}°N, ${position.longitude.toStringAsFixed(4)}°E';
+        });
+
+        await _updateBackendLocation();
+      } catch (_) {
+        // Non-critical in background loop.
+      }
+    });
+  }
+
+  /// Begin polling for new warnings and showing local notifications.
+  void _startNotificationPolling() {
+    final notif = NotificationService.instance;
+    notif.onWarningTap = (warning) {
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EmergencyAlertPage(warning: warning),
+          ),
+        );
+      }
+    };
+    notif.onEmergencyAlert = (warning) {
+      // Push the full-screen incoming alert page (like a phone call)
+      final nav = notif.navigatorKey?.currentState;
+      if (nav != null) {
+        nav.push(
+          MaterialPageRoute(
+            builder: (_) => IncomingAlertPage(warning: warning),
+          ),
+        );
+      }
+    };
+    notif.startPolling(
+      accessToken: widget.accessToken,
+      latitude: _userLat,
+      longitude: _userLon,
+    );
   }
 
   Future<void> _fetchWeather() async {
@@ -119,6 +199,10 @@ class _HomePageState extends State<HomePage> {
     try {
       await _api.updateLocation(
         accessToken: widget.accessToken,
+        latitude: _userLat,
+        longitude: _userLon,
+      );
+      NotificationService.instance.updateLocation(
         latitude: _userLat,
         longitude: _userLon,
       );
@@ -222,6 +306,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _logout() async {
+    NotificationService.instance.stopPolling();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_access_token');
     await prefs.remove('auth_email');
@@ -927,13 +1012,6 @@ class _HomePageState extends State<HomePage> {
         return const ReportsTab();
       case 2:
         return const MapTab();
-      case 3:
-        return ProfileTab(
-          accessToken: widget.accessToken,
-          username: widget.username,
-          email: widget.email,
-          onLogout: _logout,
-        );
       default:
         return _buildDashboard();
     }
@@ -1014,7 +1092,17 @@ class _HomePageState extends State<HomePage> {
                   color: Color(0xFF2E7D32),
                 ),
                 onPressed: () {
-                  setState(() => _selectedIndex = 3);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProfileTab(
+                        accessToken: widget.accessToken,
+                        username: widget.username,
+                        email: widget.email,
+                        onLogout: _logout,
+                      ),
+                    ),
+                  );
                 },
               ),
             ),
@@ -1068,7 +1156,6 @@ class _HomePageState extends State<HomePage> {
               1,
             ),
             _buildNavItem(Icons.map_outlined, Icons.map, 'Map', 2),
-            _buildNavItem(Icons.person_outline, Icons.person, 'Profile', 3),
           ],
         ),
       ),

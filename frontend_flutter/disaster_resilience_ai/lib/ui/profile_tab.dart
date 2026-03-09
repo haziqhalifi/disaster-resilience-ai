@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:disaster_resilience_ai/models/profile_model.dart';
 import 'package:disaster_resilience_ai/services/api_service.dart';
 import 'package:disaster_resilience_ai/ui/edit_profile_page.dart';
+import 'package:disaster_resilience_ai/ui/family_tab.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({
@@ -277,6 +278,20 @@ class _ProfileTabState extends State<ProfileTab> {
               'Dengkil, Selangor',
               false,
               onTap: () {},
+            ),
+            _buildSettingItem(
+              Icons.group_outlined,
+              'Family',
+              'Manage family & live location sharing',
+              false,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => FamilyTab(accessToken: widget.accessToken),
+                  ),
+                );
+              },
             ),
 
             const SizedBox(height: 32),
