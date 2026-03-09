@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:disaster_resilience_ai/models/profile_model.dart';
 import 'package:disaster_resilience_ai/services/api_service.dart';
+import 'package:disaster_resilience_ai/services/notification_service.dart';
 import 'package:disaster_resilience_ai/ui/edit_profile_page.dart';
 import 'package:disaster_resilience_ai/ui/family_tab.dart';
 
@@ -264,6 +265,38 @@ class _ProfileTabState extends State<ProfileTab> {
               'Push & SMS Alerts',
               true,
               onTap: () {},
+            ),
+            _buildSettingItem(
+              Icons.notifications_active_outlined,
+              'Test Notification',
+              'Send a test alert to verify notifications work',
+              false,
+              onTap: () async {
+                try {
+                  await NotificationService.instance.showTestNotification();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Test notification sent — check your notification tray',
+                        ),
+                        duration: Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Notifications are not supported on this platform',
+                        ),
+                        duration: Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                }
+              },
             ),
             _buildSettingItem(
               Icons.language,

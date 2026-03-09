@@ -24,6 +24,7 @@ class NotificationService {
   final ApiService _api = ApiService();
 
   Timer? _timer;
+  bool _initialized = false;
   double? _userLat;
   double? _userLon;
 
@@ -59,6 +60,7 @@ class NotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >();
     await androidPlugin?.requestNotificationsPermission();
+    _initialized = true;
   }
 
   /// Start polling for new warnings.
@@ -125,7 +127,8 @@ class NotificationService {
       _recentWarnings = warningList.warnings;
 
       for (final warning in warningList.warnings) {
-        final isHighSeverity = warning.alertLevel == AlertLevel.warning ||
+        final isHighSeverity =
+            warning.alertLevel == AlertLevel.warning ||
             warning.alertLevel == AlertLevel.evacuate;
 
         if (isHighSeverity && onEmergencyAlert != null) {
@@ -181,8 +184,9 @@ class NotificationService {
     }
 
     // Long vibration pattern for emergencies:  wait-vib-wait-vib-wait-vib
-    final vibrationPattern =
-        isEmergency ? Int64List.fromList([0, 1000, 500, 1000, 500, 1000]) : null;
+    final vibrationPattern = isEmergency
+        ? Int64List.fromList([0, 1000, 500, 1000, 500, 1000])
+        : null;
 
     final androidDetails = AndroidNotificationDetails(
       channelId,
@@ -228,5 +232,28 @@ class NotificationService {
     if (match.isNotEmpty && onWarningTap != null) {
       onWarningTap!(match.first);
     }
+  }
+
+  /// Fire a test notification immediately to verify the system works.
+  Future<void> showTestNotification() async {
+    if (!_initialized) {
+      throw StateError(
+        'Notifications are not available on this platform or init() was not called.',
+      );
+    }
+    const androidDetails = AndroidNotificationDetails(
+      'disaster_test',
+      'Test Notifications',
+      channelDescription: 'Used to verify notifications are working',
+      importance: Importance.max,
+      priority: Priority.high,
+      autoCancel: true,
+    );
+    await _plugin.show(
+      0,
+      '\u2705 Notifications are working!',
+      'You will receive alerts like this when a disaster warning is issued.',
+      const NotificationDetails(android: androidDetails),
+    );
   }
 }
