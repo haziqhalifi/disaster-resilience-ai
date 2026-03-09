@@ -112,6 +112,22 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
     updated_at                     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- ── 8. Family Links (location sharing relationships) ─────────────────────
+
+CREATE TABLE IF NOT EXISTS public.family_links (
+    id            TEXT PRIMARY KEY,
+    requester_id  TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    addressee_id  TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    status        TEXT NOT NULL CHECK (status IN ('pending', 'accepted', 'rejected')),
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    responded_at  TIMESTAMPTZ,
+    CONSTRAINT family_links_not_self CHECK (requester_id <> addressee_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_family_links_requester ON public.family_links (requester_id);
+CREATE INDEX IF NOT EXISTS idx_family_links_addressee ON public.family_links (addressee_id);
+CREATE INDEX IF NOT EXISTS idx_family_links_status ON public.family_links (status);
+
 -- ── Security & RLS ──────────────────────────────────────────────────────────
 
 ALTER TABLE public.users    ENABLE ROW LEVEL SECURITY;
@@ -121,6 +137,7 @@ ALTER TABLE public.risk_zones         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.evacuation_centres ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.evacuation_routes  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_profiles      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.family_links       ENABLE ROW LEVEL SECURITY;
 
 -- Idempotent Policy Creation using DO blocks
 DO $$ 
@@ -152,5 +169,9 @@ BEGIN
     -- user_profiles
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'user_profiles' AND policyname = 'Service role full access') THEN
         CREATE POLICY "Service role full access" ON public.user_profiles FOR ALL USING (true) WITH CHECK (true);
+    END IF;
+    -- family_links
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'family_links' AND policyname = 'Service role full access') THEN
+        CREATE POLICY "Service role full access" ON public.family_links FOR ALL USING (true) WITH CHECK (true);
     END IF;
 END $$;

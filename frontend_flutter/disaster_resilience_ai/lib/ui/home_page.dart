@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:disaster_resilience_ai/models/warning_model.dart';
@@ -13,6 +15,7 @@ import 'package:disaster_resilience_ai/ui/emergency_contacts_page.dart';
 import 'package:disaster_resilience_ai/ui/reports_tab.dart';
 import 'package:disaster_resilience_ai/ui/map_tab.dart';
 import 'package:disaster_resilience_ai/ui/profile_tab.dart';
+import 'package:disaster_resilience_ai/ui/family_tab.dart';
 import 'package:disaster_resilience_ai/ui/weather_page.dart';
 import 'package:disaster_resilience_ai/ui/chatbot_page.dart';
 import 'package:disaster_resilience_ai/models/disaster_news_model.dart';
@@ -58,11 +61,18 @@ class _HomePageState extends State<HomePage> {
   double _userLat = 3.8077;
   double _userLon = 103.3260;
   String _locationLabel = 'Locating...';
+  Timer? _liveLocationTimer;
 
   @override
   void initState() {
     super.initState();
     _determineLocation();
+  }
+
+  @override
+  void dispose() {
+    _liveLocationTimer?.cancel();
+    super.dispose();
   }
 
   /// Fetch the device's real GPS location, then kick off data fetches.
@@ -103,6 +113,43 @@ class _HomePageState extends State<HomePage> {
     _updateBackendLocation();
     _fetchWeather();
     _startNotificationPolling();
+    _startLiveLocationSync();
+  }
+
+  /// Keep uploading user's location while app is open so family members
+  /// can view near real-time movement.
+  void _startLiveLocationSync() {
+    _liveLocationTimer?.cancel();
+    _liveLocationTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+      try {
+        final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (!serviceEnabled) return;
+
+        final permission = await Geolocator.checkPermission();
+        if (permission != LocationPermission.always &&
+            permission != LocationPermission.whileInUse) {
+          return;
+        }
+
+        final position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+          ),
+        ).timeout(const Duration(seconds: 8));
+
+        if (!mounted) return;
+        setState(() {
+          _userLat = position.latitude;
+          _userLon = position.longitude;
+          _locationLabel =
+              '${position.latitude.toStringAsFixed(4)}°N, ${position.longitude.toStringAsFixed(4)}°E';
+        });
+
+        await _updateBackendLocation();
+      } catch (_) {
+        // Non-critical in background loop.
+      }
+    });
   }
 
   /// Begin polling for new warnings and showing local notifications.
@@ -967,6 +1014,8 @@ class _HomePageState extends State<HomePage> {
       case 2:
         return const MapTab();
       case 3:
+        return FamilyTab(accessToken: widget.accessToken);
+      case 4:
         return ProfileTab(
           accessToken: widget.accessToken,
           username: widget.username,
@@ -1053,7 +1102,7 @@ class _HomePageState extends State<HomePage> {
                   color: Color(0xFF2E7D32),
                 ),
                 onPressed: () {
-                  setState(() => _selectedIndex = 3);
+                  setState(() => _selectedIndex = 4);
                 },
               ),
             ),
@@ -1107,7 +1156,8 @@ class _HomePageState extends State<HomePage> {
               1,
             ),
             _buildNavItem(Icons.map_outlined, Icons.map, 'Map', 2),
-            _buildNavItem(Icons.person_outline, Icons.person, 'Profile', 3),
+            _buildNavItem(Icons.group_outlined, Icons.group, 'Family', 3),
+            _buildNavItem(Icons.person_outline, Icons.person, 'Profile', 4),
           ],
         ),
       ),

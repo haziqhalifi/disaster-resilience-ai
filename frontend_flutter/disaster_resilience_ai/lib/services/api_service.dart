@@ -379,6 +379,65 @@ class ApiService {
     throw Exception(_extractErrorMessage(response));
   }
 
+  // ── Family Location Sharing ─────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> inviteFamilyMember({
+    required String accessToken,
+    required String identifier,
+  }) async {
+    final response = await _postWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/family/invite'),
+      headers: {'Authorization': 'Bearer $accessToken'},
+      body: {'identifier': identifier},
+    );
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
+  Future<Map<String, dynamic>> fetchFamilyInvites({
+    required String accessToken,
+  }) async {
+    final response = await _getWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/family/invites'),
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
+  Future<Map<String, dynamic>> respondFamilyInvite({
+    required String accessToken,
+    required String inviteId,
+    required bool accept,
+  }) async {
+    final response = await _postWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/family/invites/$inviteId/respond'),
+      headers: {'Authorization': 'Bearer $accessToken'},
+      body: {'accept': accept},
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
+  Future<Map<String, dynamic>> fetchFamilyLocations({
+    required String accessToken,
+  }) async {
+    final response = await _getWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/family/members/locations'),
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
   /// Generic GET that returns decoded JSON or null on failure.
   /// Used by [NotificationService] for polling.
   Future<Map<String, dynamic>?> httpGet(Uri uri) async {
