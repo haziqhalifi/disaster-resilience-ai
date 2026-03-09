@@ -19,6 +19,7 @@ import 'package:disaster_resilience_ai/models/disaster_news_model.dart';
 import 'package:disaster_resilience_ai/ui/all_warnings_page.dart';
 import 'package:disaster_resilience_ai/ui/all_news_page.dart';
 import 'package:disaster_resilience_ai/services/notification_service.dart';
+import 'package:disaster_resilience_ai/ui/incoming_alert_page.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -113,6 +114,17 @@ class _HomePageState extends State<HomePage> {
           context,
           MaterialPageRoute(
             builder: (_) => EmergencyAlertPage(warning: warning),
+          ),
+        );
+      }
+    };
+    notif.onEmergencyAlert = (warning) {
+      // Push the full-screen incoming alert page (like a phone call)
+      final nav = notif.navigatorKey?.currentState;
+      if (nav != null) {
+        nav.push(
+          MaterialPageRoute(
+            builder: (_) => IncomingAlertPage(warning: warning),
           ),
         );
       }

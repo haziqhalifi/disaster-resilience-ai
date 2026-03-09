@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -8,6 +9,9 @@ import 'package:disaster_resilience_ai/models/warning_model.dart';
 import 'package:disaster_resilience_ai/services/api_service.dart';
 
 /// Handles periodic polling for new warnings and showing local notifications.
+///
+/// High-severity alerts (warning / evacuate) trigger a full-screen incoming
+/// alert experience with vibration, alarm sound, and an overlay page.
 class NotificationService {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
@@ -23,8 +27,16 @@ class NotificationService {
   double? _userLat;
   double? _userLon;
 
-  /// Callback invoked when user taps a notification.
+  /// Navigator key used to push the full-screen alert from anywhere.
+  GlobalKey<NavigatorState>? navigatorKey;
+
+  /// Callback invoked when user taps a standard (low-priority) notification.
   void Function(Warning warning)? onWarningTap;
+
+  /// Callback invoked for high-severity alerts to show the full-screen page.
+  /// If set, it takes priority over the default notification for
+  /// warning / evacuate level alerts.
+  void Function(Warning warning)? onEmergencyAlert;
 
   /// Cached list of warnings shown in the latest poll (for tap lookup).
   List<Warning> _recentWarnings = [];
@@ -113,6 +125,14 @@ class NotificationService {
       _recentWarnings = warningList.warnings;
 
       for (final warning in warningList.warnings) {
+        final isHighSeverity = warning.alertLevel == AlertLevel.warning ||
+            warning.alertLevel == AlertLevel.evacuate;
+
+        if (isHighSeverity && onEmergencyAlert != null) {
+          // Trigger full-screen incoming alert experience
+          onEmergencyAlert!(warning);
+        }
+        // Always also post a system notification (visible in tray)
         await _showNotification(warning);
       }
 
@@ -131,6 +151,7 @@ class NotificationService {
     final String channelName;
     final Importance importance;
     final Priority priority;
+    final bool isEmergency;
 
     switch (warning.alertLevel) {
       case AlertLevel.evacuate:
@@ -138,22 +159,30 @@ class NotificationService {
         channelName = 'Evacuation Alerts';
         importance = Importance.max;
         priority = Priority.max;
+        isEmergency = true;
       case AlertLevel.warning:
         channelId = 'disaster_warning';
         channelName = 'Warnings';
-        importance = Importance.high;
-        priority = Priority.high;
+        importance = Importance.max;
+        priority = Priority.max;
+        isEmergency = true;
       case AlertLevel.observe:
         channelId = 'disaster_observe';
         channelName = 'Observe Notices';
         importance = Importance.defaultImportance;
         priority = Priority.defaultPriority;
+        isEmergency = false;
       case AlertLevel.advisory:
         channelId = 'disaster_advisory';
         channelName = 'Advisories';
         importance = Importance.defaultImportance;
         priority = Priority.defaultPriority;
+        isEmergency = false;
     }
+
+    // Long vibration pattern for emergencies:  wait-vib-wait-vib-wait-vib
+    final vibrationPattern =
+        isEmergency ? Int64List.fromList([0, 1000, 500, 1000, 500, 1000]) : null;
 
     final androidDetails = AndroidNotificationDetails(
       channelId,
@@ -162,6 +191,18 @@ class NotificationService {
       importance: importance,
       priority: priority,
       ticker: warning.title,
+      // Emergency: use the device alarm sound, show on lock screen, insistent
+      sound: isEmergency
+          ? const RawResourceAndroidNotificationSound('alarm')
+          : null,
+      playSound: true,
+      enableVibration: true,
+      vibrationPattern: vibrationPattern,
+      ongoing: isEmergency,
+      autoCancel: !isEmergency,
+      fullScreenIntent: isEmergency,
+      category: isEmergency ? AndroidNotificationCategory.alarm : null,
+      visibility: NotificationVisibility.public,
       styleInformation: BigTextStyleInformation(
         '${warning.hazardType.displayName} — ${warning.description}',
         contentTitle: '[${warning.alertLevel.displayName}] ${warning.title}',
