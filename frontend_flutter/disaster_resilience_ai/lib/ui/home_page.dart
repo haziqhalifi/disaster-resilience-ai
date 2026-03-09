@@ -6,9 +6,7 @@ import 'package:disaster_resilience_ai/services/api_service.dart';
 import 'package:disaster_resilience_ai/services/weather_service.dart';
 import 'package:disaster_resilience_ai/ui/auth_page.dart';
 import 'package:disaster_resilience_ai/ui/emergency_alert_page.dart';
-import 'package:disaster_resilience_ai/ui/submit_report_page.dart';
 import 'package:disaster_resilience_ai/ui/school_preparedness_page.dart';
-import 'package:disaster_resilience_ai/ui/safe_routes_page.dart';
 import 'package:disaster_resilience_ai/ui/emergency_contacts_page.dart';
 import 'package:disaster_resilience_ai/ui/reports_tab.dart';
 import 'package:disaster_resilience_ai/ui/map_tab.dart';
@@ -171,56 +169,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// Get status display props based on alert level.
-  _StatusDisplay get _statusDisplay {
-    if (_nearbyWarnings.isEmpty) {
-      return _StatusDisplay(
-        icon: Icons.check_circle_outline,
-        label: 'Risk Status: LOW',
-        subtitle: 'Your community is currently safe',
-        gradientColors: [const Color(0xFF4CAF50), const Color(0xFF2E7D32)],
-        buttonLabel: 'VIEW ALL WARNINGS (${_allActiveWarnings.length})',
-      );
-    }
-
-    final level = _highestAlertLevel;
-    switch (level) {
-      case AlertLevel.advisory:
-        return _StatusDisplay(
-          icon: Icons.info_outline,
-          label: 'Risk Status: ADVISORY',
-          subtitle: '${_nearbyWarnings.length} advisory notice(s) in your area',
-          gradientColors: [Colors.blue[400]!, Colors.blue[700]!],
-          buttonLabel: 'VIEW ADVISORIES',
-        );
-      case AlertLevel.observe:
-        return _StatusDisplay(
-          icon: Icons.visibility_outlined,
-          label: 'Risk Status: OBSERVE',
-          subtitle:
-              '${_nearbyWarnings.length} warning(s) — monitor conditions closely',
-          gradientColors: [Colors.amber[600]!, Colors.orange[700]!],
-          buttonLabel: 'VIEW WARNINGS',
-        );
-      case AlertLevel.warning:
-        return _StatusDisplay(
-          icon: Icons.warning_amber_rounded,
-          label: 'Risk Status: WARNING',
-          subtitle: '${_nearbyWarnings.length} active warning(s) near you',
-          gradientColors: [Colors.orange[600]!, Colors.deepOrange[700]!],
-          buttonLabel: 'VIEW EMERGENCY DETAILS',
-        );
-      case AlertLevel.evacuate:
-        return _StatusDisplay(
-          icon: Icons.directions_run,
-          label: 'EVACUATE NOW',
-          subtitle: 'Immediate evacuation recommended',
-          gradientColors: [Colors.red[600]!, Colors.red[900]!],
-          buttonLabel: 'VIEW EVACUATION DETAILS',
-        );
-    }
-  }
-
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_access_token');
@@ -234,330 +182,440 @@ class _HomePageState extends State<HomePage> {
     ).pushReplacement(MaterialPageRoute(builder: (_) => const AuthPage()));
   }
 
-  Widget _buildDashboard() {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+  void _openEmergencyDetails() {
+    if (_nearbyWarnings.isNotEmpty) {
+      final mostSevere = _nearbyWarnings.reduce(
+        (a, b) =>
+            a.alertLevel.severityIndex > b.alertLevel.severityIndex ? a : b,
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => EmergencyAlertPage(warning: mostSevere),
+        ),
+      );
+      return;
+    }
 
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const EmergencyAlertPage()),
+    );
+  }
+
+  void _openWeatherPage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => WeatherPage(
+          latitude: _userLat,
+          longitude: _userLon,
+          locationName: _locationLabel,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDashboard() {
     return RefreshIndicator(
-      onRefresh: _fetchWarnings,
-      color: colorScheme.primary,
+      onRefresh: () async {
+        await Future.wait([_fetchWarnings(), _fetchWeather()]);
+      },
+      color: Theme.of(context).colorScheme.primary,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildStatusSection(),
+              const SizedBox(height: 18),
+              _buildWeatherSection(),
+              const SizedBox(height: 24),
+              _buildPrimaryActions(),
+              const SizedBox(height: 24),
+              _buildCommunityFeedSection(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusSection() {
+    final isLoaded = !_loadingWarnings;
+    final hasError = _warningError != null;
+    final hazards = hasError ? 0 : _nearbyWarnings.length;
+
+    final String safetyLabel;
+    final Color safetyColor;
+    final IconData safetyIcon;
+
+    if (!isLoaded) {
+      safetyLabel = 'Checking';
+      safetyColor = const Color(0xFF2D5927);
+      safetyIcon = Icons.hourglass_top_rounded;
+    } else if (hasError) {
+      safetyLabel = 'Unknown';
+      safetyColor = const Color(0xFF6B7280);
+      safetyIcon = Icons.wifi_off_rounded;
+    } else if (_nearbyWarnings.isEmpty) {
+      safetyLabel = 'Secure';
+      safetyColor = const Color(0xFF2D5927);
+      safetyIcon = Icons.check_circle_rounded;
+    } else {
+      safetyLabel = _highestAlertLevel.displayName;
+      switch (_highestAlertLevel) {
+        case AlertLevel.advisory:
+          safetyColor = const Color(0xFF2563EB);
+          safetyIcon = Icons.info_outline;
+          break;
+        case AlertLevel.observe:
+          safetyColor = const Color(0xFFD97706);
+          safetyIcon = Icons.visibility_outlined;
+          break;
+        case AlertLevel.warning:
+          safetyColor = const Color(0xFFEA580C);
+          safetyIcon = Icons.warning_amber_rounded;
+          break;
+        case AlertLevel.evacuate:
+          safetyColor = const Color(0xFFDC2626);
+          safetyIcon = Icons.directions_run;
+          break;
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            _buildGreetingBanner(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 12),
-                  _buildStatusCard(),
-                  const SizedBox(height: 12),
-                  _buildPrimaryActions(),
-                  const SizedBox(height: 26),
-                  // ── Active Warnings section (max 3) ──────────────────
-                  _buildSectionHeader(
-                    'Active Warnings',
-                    _allActiveWarnings.isEmpty
-                        ? null
-                        : 'View All (${_allActiveWarnings.length})',
-                    _allActiveWarnings.isEmpty
-                        ? null
-                        : () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  AllWarningsPage(warnings: _allActiveWarnings),
-                            ),
-                          ),
+            const Expanded(
+              child: Text(
+                'Your Status',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF111827),
+                ),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _openWeatherPage,
+              icon: Icon(_weather?.icon ?? Icons.cloud_outlined, size: 18),
+              label: Text(
+                _weather != null
+                    ? '${_weather!.temperature.round()}°C'
+                    : '--°C',
+              ),
+              style: TextButton.styleFrom(
+                backgroundColor: const Color(0xFF2D5927).withAlpha(16),
+                foregroundColor: const Color(0xFF2D5927),
+                shape: const StadiumBorder(),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                minimumSize: const Size(0, 36),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 1,
+          children: [
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _openEmergencyDetails,
+                borderRadius: BorderRadius.circular(16),
+                child: Ink(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: safetyColor,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: safetyColor.withAlpha(46),
+                        blurRadius: 16,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  _buildWarningsSection(),
-                  const SizedBox(height: 24),
-                  // ── Disaster News & Info section (max 3) ─────────────
-                  _buildSectionHeader(
-                    'Disaster News & Info',
-                    'View All',
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const AllNewsPage()),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildNewsSection(),
-                  const SizedBox(height: 24),
-                  // ── Quick Actions ─────────────────────────────────────
-                  _buildSectionHeader('Preparedness Tools', null, null),
-                  const SizedBox(height: 12),
-                  GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 1.1,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildActionCard(
-                        icon: Icons.campaign_outlined,
-                        title: 'Community Report',
-                        subtitle: 'Submit local updates',
-                        accentColor: Colors.orange,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const SubmitReportPage(),
-                          ),
-                        ),
+                      Icon(safetyIcon, color: Colors.white, size: 30),
+                      const Spacer(),
+                      const Text(
+                        'Safety Status',
+                        style: TextStyle(color: Colors.white70, fontSize: 13),
                       ),
-                      _buildActionCard(
-                        icon: Icons.school_outlined,
-                        title: 'School Registry',
-                        subtitle: 'Track school readiness',
-                        accentColor: Colors.indigo,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const SchoolPreparednessPage(),
-                          ),
-                        ),
-                      ),
-                      _buildActionCard(
-                        icon: Icons.directions_run,
-                        title: 'Safe Routes',
-                        subtitle: 'Fastest evacuation path',
-                        accentColor: Colors.green,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const SafeRoutesPage(),
-                          ),
-                        ),
-                      ),
-                      _buildActionCard(
-                        icon: Icons.phone_outlined,
-                        title: 'Emergency Contacts',
-                        subtitle: 'Critical numbers nearby',
-                        accentColor: Colors.red,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const EmergencyContactsPage(),
-                          ),
+                      const SizedBox(height: 2),
+                      Text(
+                        safetyLabel,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 32),
-                ],
+                ),
+              ),
+            ),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  if (_allActiveWarnings.isEmpty) {
+                    _openEmergencyDetails();
+                    return;
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          AllWarningsPage(warnings: _allActiveWarnings),
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Ink(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFF2D5927).withAlpha(32),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        hazards > 0
+                            ? Icons.warning_amber_rounded
+                            : Icons.warning_amber_outlined,
+                        color: hazards > 0
+                            ? const Color(0xFFF97316)
+                            : const Color(0xFF2D5927),
+                        size: 30,
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Active Hazards',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        !isLoaded
+                            ? 'Checking'
+                            : hazards > 0
+                            ? '$hazards Nearby'
+                            : 'None',
+                        style: const TextStyle(
+                          color: Color(0xFF111827),
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildGreetingBanner() {
-    final hour = DateTime.now().hour;
-    final greeting = hour < 12
-        ? 'Good Morning'
-        : hour < 17
-        ? 'Good Afternoon'
-        : 'Good Evening';
-
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.primaryContainer,
-            colorScheme.tertiaryContainer.withAlpha(224),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withAlpha(18),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.onPrimaryContainer.withAlpha(30),
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: Text(
-                    'LIVE MONITORING',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onPrimaryContainer,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  '$greeting, ${widget.username} 👋',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: colorScheme.onPrimaryContainer,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Your community resilience command center',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onPrimaryContainer.withAlpha(220),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: colorScheme.surface.withAlpha(150),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                Icon(
-                  Icons.wifi_tethering_rounded,
-                  size: 18,
-                  color: colorScheme.onPrimaryContainer,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Online',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onPrimaryContainer,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(
-    String title,
-    String? actionLabel,
-    VoidCallback? onAction,
-  ) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text(
-          title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        if (actionLabel != null && onAction != null)
-          TextButton(
-            onPressed: onAction,
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.primary,
-              visualDensity: VisualDensity.compact,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(actionLabel),
-          ),
       ],
     );
   }
 
-  Widget _buildPrimaryActions() {
-    final colorScheme = Theme.of(context).colorScheme;
+  Widget _buildWeatherSection() {
+    final hasWeather = _weather != null;
 
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _openWeatherPage,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF2D5927).withAlpha(28)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2D5927).withAlpha(16),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        hasWeather
+                            ? _weather!.icon
+                            : Icons.thunderstorm_outlined,
+                        color: const Color(0xFF2D5927),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            hasWeather
+                                ? 'Local Weather: ${_weather!.description}'
+                                : 'Local Weather Update',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF111827),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            hasWeather
+                                ? 'Heavy rainfall risk can shift quickly. Check your nearest safe route now.'
+                                : 'Pull down to refresh the latest weather status for your location.',
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 13,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                height: 146,
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: const BoxDecoration(
+                  borderRadius: BorderRadius.vertical(
+                    bottom: Radius.circular(16),
+                  ),
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF3A6EA5), Color(0xFF22325C)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _locationLabel,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Spacer(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          hasWeather
+                              ? '${_weather!.temperature.round()}°C'
+                              : '--°C',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 30,
+                          ),
+                        ),
+                        const Icon(
+                          Icons.radar_rounded,
+                          color: Colors.white70,
+                          size: 32,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
+    );
+  }
+
+  Widget _buildPrimaryActions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Quick Actions',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF111827),
+          ),
+        ),
+        const SizedBox(height: 12),
+        GridView.count(
+          crossAxisCount: 4,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          childAspectRatio: 0.85,
           children: [
             _buildPrimaryActionChip(
-              icon: Icons.notifications_active_outlined,
-              label: 'Alerts',
-              onPressed: () {
-                if (_nearbyWarnings.isNotEmpty) {
-                  final mostSevere = _nearbyWarnings.reduce(
-                    (a, b) =>
-                        a.alertLevel.severityIndex > b.alertLevel.severityIndex
-                        ? a
-                        : b,
-                  );
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          EmergencyAlertPage(warning: mostSevere),
-                    ),
-                  );
-                } else {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const EmergencyAlertPage(),
-                    ),
-                  );
-                }
-              },
-              filled: true,
+              icon: Icons.map_outlined,
+              label: 'Maps',
+              onPressed: () => setState(() => _selectedIndex = 2),
             ),
-            const SizedBox(width: 8),
             _buildPrimaryActionChip(
-              icon: Icons.alt_route,
-              label: 'Safe Route',
+              icon: Icons.assignment_outlined,
+              label: 'Plan',
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const SafeRoutesPage()),
+                MaterialPageRoute(
+                  builder: (_) => const SchoolPreparednessPage(),
+                ),
               ),
             ),
-            const SizedBox(width: 8),
             _buildPrimaryActionChip(
-              icon: Icons.edit_note,
-              label: 'Report',
+              icon: Icons.medical_services_outlined,
+              label: 'First Aid',
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const SubmitReportPage()),
+                MaterialPageRoute(
+                  builder: (_) => const EmergencyContactsPage(),
+                ),
               ),
+            ),
+            _buildPrimaryActionChip(
+              icon: Icons.sos_outlined,
+              label: 'SOS',
+              onPressed: _openEmergencyDetails,
             ),
           ],
         ),
-      ),
+      ],
     );
   }
 
@@ -565,482 +623,190 @@ class _HomePageState extends State<HomePage> {
     required IconData icon,
     required String label,
     required VoidCallback onPressed,
-    bool filled = false,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textStyle = Theme.of(
-      context,
-    ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700);
-
-    final buttonStyle = OutlinedButton.styleFrom(
-      foregroundColor: colorScheme.onSurface,
-      side: BorderSide(color: colorScheme.outlineVariant),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      textStyle: textStyle,
-    );
-
-    if (filled) {
-      return FilledButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 18),
-        label: Text(label),
-        style: FilledButton.styleFrom(
-          backgroundColor: colorScheme.primary,
-          foregroundColor: colorScheme.onPrimary,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          textStyle: textStyle,
-        ),
-      );
-    }
-
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 18),
-      label: Text(label),
-      style: buttonStyle,
-    );
-  }
-
-  Widget _buildWarningsSection() {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    if (_loadingWarnings) {
-      return Padding(
-        padding: const EdgeInsets.all(24),
-        child: Center(
-          child: CircularProgressIndicator(
-            color: colorScheme.primary,
-            strokeWidth: 2,
-          ),
-        ),
-      );
-    }
-    if (_warningError != null) {
-      return Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.orange[50],
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.orange[200]!),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.wifi_off, color: Colors.orange[700], size: 22),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Could not fetch warnings. Pull down to retry.',
-                style: TextStyle(color: Colors.orange[800], fontSize: 13),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    if (_nearbyWarnings.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F8E9),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFC8E6C9)),
-        ),
-        child: const Row(
-          children: [
-            Icon(
-              Icons.check_circle_outline,
-              color: Color(0xFF4CAF50),
-              size: 28,
-            ),
-            SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'No active warnings',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2E7D32),
-                  ),
-                ),
-                Text(
-                  'Your area is currently safe',
-                  style: TextStyle(color: Color(0xFF4CAF50), fontSize: 12),
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
-    }
-    final shown = _nearbyWarnings.take(3).toList();
-    return Column(children: shown.map(_buildWarningTile).toList());
-  }
-
-  Widget _buildNewsSection() {
-    final news = DisasterNewsData.articles.take(3).toList();
-    return Column(children: news.map(_buildNewsTile).toList());
-  }
-
-  Widget _buildNewsTile(DisasterNews article) {
-    return InkWell(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => NewsDetailPage(article: article)),
-      ),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(10),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: article.accentColor.withAlpha(28),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(article.icon, color: article.accentColor, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    article.title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: Color(0xFF1E293B),
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${article.category} · ${article.readMinutes} min read',
-                    style: TextStyle(color: Colors.grey[700], fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 6),
-            Icon(Icons.chevron_right, color: Colors.grey[400]),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatusCard() {
-    if (_loadingWarnings) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(40),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF4CAF50), Color(0xFF2E7D32)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const Column(
-          children: [
-            SizedBox(
-              width: 32,
-              height: 32,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Checking area status...',
-              style: TextStyle(color: Colors.white, fontSize: 14),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_warningError != null) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF4CAF50), Color(0xFF2E7D32)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-          borderRadius: BorderRadius.circular(16),
-        ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(16),
         child: Column(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(51),
-                shape: BoxShape.circle,
+                color: const Color(0xFF2D5927).withAlpha(16),
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: const Icon(Icons.wifi_off, color: Colors.white, size: 40),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'CURRENT STATUS',
-              style: TextStyle(
-                color: Colors.white70,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-                fontSize: 12,
-              ),
+              child: Icon(icon, color: const Color(0xFF2D5927)),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Unable to check warnings',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-              ),
-            ),
-            const SizedBox(height: 4),
             Text(
-              'Backend unreachable — pull to refresh',
-              style: TextStyle(
-                color: Colors.white.withAlpha(178),
-                fontSize: 13,
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _fetchWarnings,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: const Color(0xFF2E7D32),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'RETRY',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                ),
+              label,
+              style: const TextStyle(
+                color: Color(0xFF111827),
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
               ),
             ),
           ],
         ),
-      );
-    }
-
-    final status = _statusDisplay;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: status.gradientColors,
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withAlpha(51),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(status.icon, color: Colors.white, size: 40),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'CURRENT STATUS',
-            style: TextStyle(
-              color: Colors.white70,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.2,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            status.label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 24,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            status.subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                if (_nearbyWarnings.isNotEmpty) {
-                  // Navigate to emergency alert page with the most severe warning
-                  final mostSevere = _nearbyWarnings.reduce(
-                    (a, b) =>
-                        a.alertLevel.severityIndex > b.alertLevel.severityIndex
-                        ? a
-                        : b,
-                  );
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          EmergencyAlertPage(warning: mostSevere),
-                    ),
-                  );
-                } else {
-                  // Show all active warnings page
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const EmergencyAlertPage(),
-                    ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: status.gradientColors.last,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: Text(
-                status.buttonLabel,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
 
-  Widget _buildWarningTile(Warning warning) {
-    final Color tileColor;
-    final Color borderColor;
-    final Color iconColor;
-    final IconData icon;
+  Widget _buildCommunityFeedSection() {
+    final warnings = _nearbyWarnings.take(1).toList();
+    final news = DisasterNewsData.articles.take(1).toList();
 
-    switch (warning.alertLevel) {
-      case AlertLevel.evacuate:
-        tileColor = Colors.red[50]!;
-        borderColor = Colors.red[300]!;
-        iconColor = Colors.red[700]!;
-        icon = Icons.directions_run;
-        break;
-      case AlertLevel.warning:
-        tileColor = Colors.orange[50]!;
-        borderColor = Colors.orange[300]!;
-        iconColor = Colors.orange[700]!;
-        icon = Icons.warning_amber_rounded;
-        break;
-      case AlertLevel.observe:
-        tileColor = Colors.amber[50]!;
-        borderColor = Colors.amber[300]!;
-        iconColor = Colors.amber[700]!;
-        icon = Icons.visibility_outlined;
-        break;
-      case AlertLevel.advisory:
-        tileColor = Colors.blue[50]!;
-        borderColor = Colors.blue[200]!;
-        iconColor = Colors.blue[700]!;
-        icon = Icons.info_outline;
-        break;
-    }
-
-    final timeAgo = _timeAgo(warning.createdAt);
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => EmergencyAlertPage(warning: warning),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: tileColor,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: borderColor, width: 1.5),
-        ),
-        child: Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: iconColor, size: 24),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    warning.title,
-                    style: const TextStyle(
-                      color: Color(0xFF1E293B),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${warning.hazardType.displayName} • ${warning.alertLevel.displayName} • $timeAgo',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                  ),
-                ],
+            const Expanded(
+              child: Text(
+                'Community Feed',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF111827),
+                ),
               ),
             ),
-            Icon(Icons.chevron_right, color: iconColor),
+            TextButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AllNewsPage()),
+              ),
+              child: const Text(
+                'View All',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
           ],
+        ),
+        const SizedBox(height: 8),
+        if (_loadingWarnings && warnings.isEmpty)
+          _buildFeedCard(
+            source: 'Resilience AI',
+            meta: 'Updating • $_locationLabel',
+            message: 'Fetching live community updates for your area.',
+            onTap: _fetchWarnings,
+          ),
+        if (_warningError != null && warnings.isEmpty)
+          _buildFeedCard(
+            source: 'Resilience AI',
+            meta: 'Connection issue • $_locationLabel',
+            message:
+                'Unable to load warning feed right now. Pull down to retry.',
+            onTap: _fetchWarnings,
+          ),
+        ...warnings.map(
+          (warning) => _buildFeedCard(
+            source: warning.source,
+            meta: '${_timeAgo(warning.createdAt)} • $_locationLabel',
+            message: warning.description,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => EmergencyAlertPage(warning: warning),
+              ),
+            ),
+          ),
+        ),
+        ...news.map(
+          (article) => _buildFeedCard(
+            source: article.source,
+            meta: '${_timeAgo(article.publishedAt)} • ${article.category}',
+            message: article.summary,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => NewsDetailPage(article: article),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFeedCard({
+    required String source,
+    required String meta,
+    required String message,
+    required VoidCallback onTap,
+  }) {
+    final initial = source.isEmpty ? 'R' : source[0].toUpperCase();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF2D5927).withAlpha(30)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF2D5927).withAlpha(20),
+                      ),
+                      child: Text(
+                        initial,
+                        style: const TextStyle(
+                          color: Color(0xFF2D5927),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            source,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF111827),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            meta,
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  message,
+                  style: TextStyle(color: Colors.grey[800], height: 1.35),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -1052,66 +818,6 @@ class _HomePageState extends State<HomePage> {
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     return '${diff.inDays}d ago';
-  }
-
-  Widget _buildActionCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color accentColor,
-    required VoidCallback onTap,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: colorScheme.outlineVariant, width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: colorScheme.shadow.withAlpha(12),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: accentColor.withAlpha(30),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: accentColor, size: 24),
-            ),
-            const Spacer(),
-            Text(
-              title,
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: TextStyle(
-                color: colorScheme.onSurfaceVariant,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Widget _buildBody() {
@@ -1134,16 +840,50 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  NavigationDestination _buildNavDestination({
+    required String label,
+    required IconData icon,
+    required IconData selectedIcon,
+  }) {
+    const Color navPrimary = Color(0xFF2D5927);
+    return NavigationDestination(
+      label: label,
+      icon: Icon(icon),
+      selectedIcon: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: navPrimary.withAlpha(18),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(selectedIcon, size: 24, color: navPrimary),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: const TextStyle(
+                color: navPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerLowest,
+      backgroundColor: const Color(0xFFF6F7F6),
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        backgroundColor: colorScheme.surface,
+        backgroundColor: const Color(0xFFF6F7F6),
         surfaceTintColor: colorScheme.surfaceTint,
         scrolledUnderElevation: 1,
         elevation: 0,
@@ -1159,41 +899,50 @@ class _HomePageState extends State<HomePage> {
             letterSpacing: 0.2,
           ),
         ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(
+            height: 1,
+            color: const Color(0xFF2D5927).withAlpha(26),
+          ),
+        ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: TextButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => WeatherPage(
-                      latitude: _userLat,
-                      longitude: _userLon,
-                      locationName: _locationLabel,
-                    ),
-                  ),
-                );
-              },
-              icon: Icon(_weather?.icon ?? Icons.cloud_outlined, size: 18),
-              label: Text(
-                _weather != null
-                    ? '${_weather!.temperature.round()}°C'
-                    : '--°C',
-              ),
-              style: TextButton.styleFrom(
-                backgroundColor: colorScheme.secondaryContainer,
-                foregroundColor: colorScheme.onSecondaryContainer,
-                shape: const StadiumBorder(),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-                minimumSize: const Size(0, 36),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          IconButton(
+            tooltip: 'Warnings',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AllWarningsPage(warnings: _allActiveWarnings),
               ),
             ),
+            icon: Stack(
+              children: [
+                const Icon(Icons.notifications),
+                if (_nearbyWarnings.isNotEmpty)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.redAccent,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
+          IconButton(
+            tooltip: 'Browse News',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AllNewsPage()),
+            ),
+            icon: const Icon(Icons.search_rounded),
+          ),
+          const SizedBox(width: 8),
         ],
       ),
       body: _buildBody(),
@@ -1212,50 +961,34 @@ class _HomePageState extends State<HomePage> {
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) =>
             setState(() => _selectedIndex = index),
-        backgroundColor: colorScheme.surfaceContainerHigh,
-        indicatorColor: colorScheme.secondaryContainer,
+        backgroundColor: Colors.white,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+        indicatorColor: Colors.transparent,
         shadowColor: colorScheme.shadow.withAlpha(32),
         elevation: 4,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
+        destinations: [
+          _buildNavDestination(
             label: 'Home',
+            icon: Icons.home_outlined,
+            selectedIcon: Icons.home,
           ),
-          NavigationDestination(
-            icon: Icon(Icons.insert_chart_outlined),
-            selectedIcon: Icon(Icons.insert_chart),
+          _buildNavDestination(
             label: 'Reports',
+            icon: Icons.insert_chart_outlined,
+            selectedIcon: Icons.insert_chart,
           ),
-          NavigationDestination(
-            icon: Icon(Icons.map_outlined),
-            selectedIcon: Icon(Icons.map),
+          _buildNavDestination(
             label: 'Map',
+            icon: Icons.map_outlined,
+            selectedIcon: Icons.map,
           ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
+          _buildNavDestination(
             label: 'Profile',
+            icon: Icons.person_outline,
+            selectedIcon: Icons.person,
           ),
         ],
       ),
     );
   }
-}
-
-/// Helper class for status card display properties.
-class _StatusDisplay {
-  final IconData icon;
-  final String label;
-  final String subtitle;
-  final List<Color> gradientColors;
-  final String buttonLabel;
-
-  const _StatusDisplay({
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    required this.gradientColors,
-    required this.buttonLabel,
-  });
 }
