@@ -55,9 +55,9 @@ class AppThemes {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor: const Color(0xFFF6F7F6),
+      scaffoldBackgroundColor: const Color(0xFFF0F2F5),
       appBarTheme: AppBarTheme(
-        backgroundColor: const Color(0xFFF6F7F6),
+        backgroundColor: const Color(0xFFF0F2F5),
         foregroundColor: scheme.onSurface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
@@ -94,9 +94,9 @@ class AppThemes {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor: const Color(0xFF111611),
+      scaffoldBackgroundColor: const Color(0xFF0F140F),
       appBarTheme: AppBarTheme(
-        backgroundColor: const Color(0xFF111611),
+        backgroundColor: const Color(0xFF0F140F),
         foregroundColor: scheme.onSurface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,

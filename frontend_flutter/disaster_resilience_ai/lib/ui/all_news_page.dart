@@ -6,48 +6,82 @@ class AllNewsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pageBg = isDark ? const Color(0xFF0F140F) : const Color(0xFFF0F2F5);
+    final barBg = isDark ? const Color(0xFF1B251B) : Colors.white;
+    final titleColor = isDark
+        ? const Color(0xFFE5E7EB)
+        : const Color(0xFF1E293B);
+    final subtitleColor = isDark
+        ? const Color(0xFF9AA79B)
+        : const Color(0xFF64748B);
+    final dividerColor = isDark
+        ? const Color(0xFF334236)
+        : const Color(0xFF2D5927).withAlpha(26);
     final articles = DisasterNewsData.articles;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: pageBg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: barBg,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 1,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios_new_rounded,
-            color: Color(0xFF2E7D32),
+            color: isDark ? const Color(0xFF9EDB94) : const Color(0xFF2E7D32),
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Disaster News & Info',
               style: TextStyle(
-                color: Color(0xFF1E293B),
+                color: titleColor,
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
               ),
             ),
             Text(
               'Guides, updates & preparedness',
-              style: TextStyle(color: Colors.grey, fontSize: 12),
+              style: TextStyle(color: subtitleColor, fontSize: 12),
             ),
           ],
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: dividerColor),
         ),
       ),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: articles.length,
         itemBuilder: (context, index) =>
-            _buildArticleTile(context, articles[index]),
+            _buildArticleTile(context, articles[index], isDark),
       ),
     );
   }
 
-  Widget _buildArticleTile(BuildContext context, DisasterNews article) {
+  Widget _buildArticleTile(
+    BuildContext context,
+    DisasterNews article,
+    bool isDark,
+  ) {
+    final surface = isDark ? const Color(0xFF1B251B) : Colors.white;
+    final border = isDark ? const Color(0xFF334236) : const Color(0xFFE8E8E8);
+    final titleColor = isDark
+        ? const Color(0xFFE5E7EB)
+        : const Color(0xFF1E293B);
+    final bodyColor = isDark
+        ? const Color(0xFFB8C2BA)
+        : const Color(0xFF64748B);
+    final metaColor = isDark
+        ? const Color(0xFF9AA79B)
+        : const Color(0xFF6B7280);
+
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
@@ -56,9 +90,9 @@ class AllNewsPage extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: surface,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE8E8E8)),
+          border: Border.all(color: border),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withAlpha(10),
@@ -124,17 +158,17 @@ class AllNewsPage extends StatelessWidget {
                         const SizedBox(height: 6),
                         Text(
                           article.title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
-                            color: Color(0xFF1E293B),
+                            color: titleColor,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           article.summary,
                           style: TextStyle(
-                            color: Colors.grey[600],
+                            color: bodyColor,
                             fontSize: 12,
                             height: 1.4,
                           ),
@@ -147,28 +181,25 @@ class AllNewsPage extends StatelessWidget {
                             Icon(
                               Icons.access_time_rounded,
                               size: 12,
-                              color: Colors.grey[500],
+                              color: metaColor,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               '${article.readMinutes} min read',
-                              style: TextStyle(
-                                color: Colors.grey[500],
-                                fontSize: 11,
-                              ),
+                              style: TextStyle(color: metaColor, fontSize: 11),
                             ),
                             const SizedBox(width: 12),
                             Icon(
                               Icons.source_rounded,
                               size: 12,
-                              color: Colors.grey[500],
+                              color: metaColor,
                             ),
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
                                 article.source,
                                 style: TextStyle(
-                                  color: Colors.grey[500],
+                                  color: metaColor,
                                   fontSize: 11,
                                 ),
                                 overflow: TextOverflow.ellipsis,
@@ -179,7 +210,7 @@ class AllNewsPage extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+                  Icon(Icons.chevron_right, color: metaColor, size: 20),
                 ],
               ),
             ),
@@ -197,8 +228,20 @@ class NewsDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pageBg = isDark ? const Color(0xFF0F140F) : Colors.white;
+    final titleColor = isDark
+        ? const Color(0xFFE5E7EB)
+        : const Color(0xFF1E293B);
+    final bodyColor = isDark
+        ? const Color(0xFFB8C2BA)
+        : const Color(0xFF334155);
+    final metaColor = isDark
+        ? const Color(0xFF9AA79B)
+        : const Color(0xFF6B7280);
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: pageBg,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
@@ -287,17 +330,20 @@ class NewsDetailPage extends StatelessWidget {
                       const Spacer(),
                       Icon(
                         Icons.access_time_rounded,
-                        color: Colors.grey[500],
+                        color: metaColor,
                         size: 14,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         '${article.readMinutes} min read',
-                        style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                        style: TextStyle(color: metaColor, fontSize: 12),
                       ),
                     ],
                   ),
-                  const Divider(height: 24),
+                  Divider(
+                    height: 24,
+                    color: isDark ? const Color(0xFF334236) : null,
+                  ),
                   // Summary callout
                   Container(
                     padding: const EdgeInsets.all(14),
@@ -320,7 +366,7 @@ class NewsDetailPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
                   // Body
-                  ..._parseBody(article.body),
+                  ..._parseBody(article.body, titleColor, bodyColor),
                   const SizedBox(height: 40),
                 ],
               ),
@@ -331,7 +377,7 @@ class NewsDetailPage extends StatelessWidget {
     );
   }
 
-  List<Widget> _parseBody(String body) {
+  List<Widget> _parseBody(String body, Color titleColor, Color bodyColor) {
     final paragraphs = body.split('\n\n');
     return paragraphs.map<Widget>((para) {
       para = para.trim();
@@ -340,26 +386,22 @@ class NewsDetailPage extends StatelessWidget {
       }
       return Padding(
         padding: const EdgeInsets.only(bottom: 14),
-        child: _renderParagraph(para),
+        child: _renderParagraph(para, titleColor, bodyColor),
       );
     }).toList();
   }
 
-  Widget _renderParagraph(String para) {
+  Widget _renderParagraph(String para, Color titleColor, Color bodyColor) {
     final spans = <TextSpan>[];
-    final regex = RegExp(r'\*\*(.*?)\*\*');
-    const baseStyle = TextStyle(
-      fontSize: 14,
-      color: Color(0xFF334155),
-      height: 1.65,
-    );
+    const regex = r'\*\*(.*?)\*\*';
+    final baseStyle = TextStyle(fontSize: 14, color: bodyColor, height: 1.65);
     final boldStyle = baseStyle.copyWith(
       fontWeight: FontWeight.bold,
-      color: const Color(0xFF1E293B),
+      color: titleColor,
     );
 
     int last = 0;
-    for (final match in regex.allMatches(para)) {
+    for (final match in RegExp(regex).allMatches(para)) {
       if (match.start > last) {
         spans.add(
           TextSpan(text: para.substring(last, match.start), style: baseStyle),

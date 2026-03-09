@@ -1,4 +1,5 @@
 import 'package:disaster_resilience_ai/services/api_service.dart';
+import 'package:disaster_resilience_ai/ui/widgets/landa_wordmark.dart';
 import 'package:disaster_resilience_ai/ui/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,6 +23,7 @@ class _AuthPageState extends State<AuthPage> {
   final _passwordController = TextEditingController();
 
   bool _isSignIn = true;
+  bool _acceptedTerms = false;
   bool _loading = false;
   bool _restoring = true;
   String? _error;
@@ -95,6 +97,7 @@ class _AuthPageState extends State<AuthPage> {
     setState(() {
       _isSignIn = !_isSignIn;
       _error = null;
+      _acceptedTerms = false;
     });
   }
 
@@ -146,6 +149,116 @@ class _AuthPageState extends State<AuthPage> {
     await prefs.setString(_usernameKey, username);
   }
 
+  void _openTermsOfService() {
+    _showLegalPopup(
+      title: 'Terms of Service',
+      sections: const [
+        _LegalSection(
+          heading: '1. Use of Service',
+          body:
+              'LANDA provides disaster preparedness information and tools for community support. You agree to use the app lawfully and responsibly.',
+        ),
+        _LegalSection(
+          heading: '2. User Content',
+          body:
+              'Reports you submit may be reviewed by administrators and relevant teams. Do not submit false, harmful, or unlawful content.',
+        ),
+        _LegalSection(
+          heading: '3. Availability',
+          body:
+              'We strive to keep the app available and accurate, but we do not guarantee uninterrupted service or complete accuracy at all times.',
+        ),
+      ],
+    );
+  }
+
+  void _openPrivacyPolicy() {
+    _showLegalPopup(
+      title: 'Privacy Policy',
+      sections: const [
+        _LegalSection(
+          heading: '1. Data Collected',
+          body:
+              'We may collect account details, submitted reports, and location data (when permitted) to provide warnings and app features.',
+        ),
+        _LegalSection(
+          heading: '2. Data Usage',
+          body:
+              'Your information is used to operate the app, improve safety insights, and support emergency-related functions.',
+        ),
+        _LegalSection(
+          heading: '3. Data Protection',
+          body:
+              'We apply reasonable safeguards to protect your information. You can contact support for account and data-related requests.',
+        ),
+      ],
+    );
+  }
+
+  void _showLegalPopup({
+    required String title,
+    required List<_LegalSection> sections,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dialogBg = isDark ? const Color(0xFF202427) : const Color(0xFFF7F8FA);
+    final heading = isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1E293B);
+    final text = isDark ? const Color(0xFFD1D5DB) : const Color(0xFF374151);
+    final borderColor = isDark
+        ? const Color(0xFF374151)
+        : const Color(0xFFE5E7EB);
+
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: dialogBg,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: borderColor),
+          ),
+          title: Text(title),
+          content: SizedBox(
+            width: 420,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (int i = 0; i < sections.length; i++) ...[
+                    Text(
+                      sections[i].heading,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: heading,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      sections[i].body,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        height: 1.4,
+                        color: text,
+                      ),
+                    ),
+                    if (i != sections.length - 1) const SizedBox(height: 14),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -163,7 +276,7 @@ class _AuthPageState extends State<AuthPage> {
       );
     }
 
-    final title = _isSignIn ? 'Welcome Back' : 'Create Account';
+    final title = _isSignIn ? 'Welcome' : 'Create Account';
 
     return Scaffold(
       backgroundColor: bg,
@@ -171,12 +284,9 @@ class _AuthPageState extends State<AuthPage> {
         backgroundColor: bg,
         elevation: 0,
         centerTitle: true,
-        title: const Text(
-          'Resilience AI',
-          style: TextStyle(
-            color: Color(0xFF2E7D32),
-            fontWeight: FontWeight.bold,
-          ),
+        title: LandaBrandTitle(
+          wordmarkSize: 25,
+          iconColor: const Color(0xFF2D5927),
         ),
       ),
       body: Center(
@@ -217,8 +327,8 @@ class _AuthPageState extends State<AuthPage> {
                   const SizedBox(height: 8),
                   Text(
                     _isSignIn
-                        ? 'Sign in to monitor your community'
-                        : 'Join us to stay resilient',
+                        ? 'Sign in to your account'
+                        : 'Join us to stay disaster-resilient',
                     style: TextStyle(fontSize: 14, color: muted),
                   ),
                   const SizedBox(height: 32),
@@ -324,6 +434,69 @@ class _AuthPageState extends State<AuthPage> {
                       return null;
                     },
                   ),
+                  if (!_isSignIn) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Checkbox(
+                          value: _acceptedTerms,
+                          activeColor: const Color(0xFF2E7D32),
+                          onChanged: _loading
+                              ? null
+                              : (value) => setState(
+                                  () => _acceptedTerms = value ?? false,
+                                ),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  'I agree to the ',
+                                  style: TextStyle(fontSize: 14, color: muted),
+                                ),
+                                GestureDetector(
+                                  onTap: _openTermsOfService,
+                                  child: const Text(
+                                    'Terms of Service',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Color(0xFF2E7D32),
+                                      fontWeight: FontWeight.w700,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  ' and ',
+                                  style: TextStyle(fontSize: 14, color: muted),
+                                ),
+                                GestureDetector(
+                                  onTap: _openPrivacyPolicy,
+                                  child: const Text(
+                                    'Privacy Policy',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Color(0xFF2E7D32),
+                                      fontWeight: FontWeight.w700,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  '.',
+                                  style: TextStyle(fontSize: 14, color: muted),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   if (_error != null) ...[
                     const SizedBox(height: 16),
                     Container(
@@ -349,7 +522,18 @@ class _AuthPageState extends State<AuthPage> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _loading ? null : _submit,
+                      onPressed: _loading
+                          ? null
+                          : () {
+                              if (!_isSignIn && !_acceptedTerms) {
+                                setState(
+                                  () => _error =
+                                      'Please accept the Terms of Service and Privacy Policy.',
+                                );
+                                return;
+                              }
+                              _submit();
+                            },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF2E7D32),
                         foregroundColor: Colors.white,
@@ -401,4 +585,11 @@ class _AuthPageState extends State<AuthPage> {
       ),
     );
   }
+}
+
+class _LegalSection {
+  const _LegalSection({required this.heading, required this.body});
+
+  final String heading;
+  final String body;
 }

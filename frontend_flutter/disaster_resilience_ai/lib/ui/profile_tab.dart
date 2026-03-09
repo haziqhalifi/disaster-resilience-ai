@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:disaster_resilience_ai/models/profile_model.dart';
+import 'package:disaster_resilience_ai/localization/app_language.dart';
 import 'package:disaster_resilience_ai/services/api_service.dart';
 import 'package:disaster_resilience_ai/theme/app_theme.dart';
 import 'package:disaster_resilience_ai/ui/edit_profile_page.dart';
@@ -33,6 +34,103 @@ class _ProfileTabState extends State<ProfileTab> {
   void initState() {
     super.initState();
     _fetchProfile();
+  }
+
+  Future<void> _selectLanguage() async {
+    final languageController = AppLanguageScope.of(context);
+    final selectedLanguage = languageController.label;
+    final currentLanguage = languageController.language;
+    String tr({required String en, required String ms, required String zh}) {
+      return switch (currentLanguage) {
+        AppLanguage.english => en,
+        AppLanguage.malay => ms,
+        AppLanguage.chinese => zh,
+      };
+    }
+
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final subtitleColor = isDark
+            ? const Color(0xFFA7B5A8)
+            : const Color(0xFF64748B);
+        final checkColor = isDark
+            ? const Color(0xFFD1D5DB)
+            : const Color(0xFF475569);
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: Text(
+                  tr(en: 'Choose Language', ms: 'Pilih Bahasa', zh: '选择语言'),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              ListTile(
+                title: const Text('English'),
+                subtitle: Text(
+                  tr(
+                    en: 'Use English across the app',
+                    ms: 'Guna bahasa Inggeris dalam aplikasi',
+                    zh: '在整个应用中使用英语',
+                  ),
+                  style: TextStyle(color: subtitleColor),
+                ),
+                trailing: selectedLanguage == 'English'
+                    ? Icon(Icons.check, color: checkColor)
+                    : null,
+                onTap: () => Navigator.pop(context, 'English'),
+              ),
+              ListTile(
+                title: const Text('Bahasa Melayu'),
+                subtitle: Text(
+                  tr(
+                    en: 'Use Bahasa Melayu across the app',
+                    ms: 'Guna Bahasa Melayu dalam aplikasi',
+                    zh: '在整个应用中使用马来语',
+                  ),
+                  style: TextStyle(color: subtitleColor),
+                ),
+                trailing: selectedLanguage == 'Bahasa Melayu'
+                    ? Icon(Icons.check, color: checkColor)
+                    : null,
+                onTap: () => Navigator.pop(context, 'Bahasa Melayu'),
+              ),
+              ListTile(
+                title: const Text('Chinese (Mandarin)'),
+                subtitle: Text(
+                  tr(
+                    en: 'Use Mandarin Chinese across the app',
+                    ms: 'Guna Bahasa Cina Mandarin dalam aplikasi',
+                    zh: '在整个应用中使用普通话',
+                  ),
+                  style: TextStyle(color: subtitleColor),
+                ),
+                trailing: selectedLanguage == 'Chinese (Mandarin)'
+                    ? Icon(Icons.check, color: checkColor)
+                    : null,
+                onTap: () => Navigator.pop(context, 'Chinese (Mandarin)'),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (selected == null || selected == selectedLanguage) return;
+    if (selected == 'Bahasa Melayu') {
+      await languageController.setLanguage(AppLanguage.malay);
+      return;
+    }
+    if (selected == 'Chinese (Mandarin)') {
+      await languageController.setLanguage(AppLanguage.chinese);
+      return;
+    }
+    await languageController.setLanguage(AppLanguage.english);
   }
 
   Future<void> _fetchProfile() async {
@@ -80,6 +178,16 @@ class _ProfileTabState extends State<ProfileTab> {
     const Color primary = Color(0xFF2D5927);
     final theme = Theme.of(context);
     final themeController = AppThemeScope.of(context);
+    final languageController = AppLanguageScope.of(context);
+    final language = languageController.language;
+    String tr({required String en, required String ms, required String zh}) {
+      return switch (language) {
+        AppLanguage.english => en,
+        AppLanguage.malay => ms,
+        AppLanguage.chinese => zh,
+      };
+    }
+
     final isDark = theme.brightness == Brightness.dark;
     final pageBg = theme.scaffoldBackgroundColor;
     final surface = isDark ? const Color(0xFF1B251B) : Colors.white;
@@ -93,7 +201,6 @@ class _ProfileTabState extends State<ProfileTab> {
     final tertiaryText = isDark
         ? const Color(0xFF8A9A8B)
         : const Color(0xFF94A3B8);
-    final titleColor = theme.colorScheme.onSurface;
 
     if (_loading) {
       return const Center(child: CircularProgressIndicator(color: primary));
@@ -106,11 +213,17 @@ class _ProfileTabState extends State<ProfileTab> {
           children: [
             const Icon(Icons.error_outline, size: 48, color: Colors.red),
             const SizedBox(height: 16),
-            Text('Error loading profile: $_error'),
+            Text(
+              tr(
+                en: 'Error loading profile: $_error',
+                ms: 'Ralat memuatkan profil: $_error',
+                zh: '加载个人资料出错：$_error',
+              ),
+            ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _fetchProfile,
-              child: const Text('Retry'),
+              child: Text(tr(en: 'Retry', ms: 'Cuba Lagi', zh: '重试')),
             ),
           ],
         ),
@@ -118,10 +231,22 @@ class _ProfileTabState extends State<ProfileTab> {
     }
 
     final profile = _profile!;
+    final hasEmergencyContact =
+        (profile.emergencyContactName?.trim().isNotEmpty ?? false) ||
+        (profile.emergencyContactPhone?.trim().isNotEmpty ?? false) ||
+        (profile.emergencyContactRelationship?.trim().isNotEmpty ?? false);
     final displayName = profile.fullName?.isNotEmpty == true
         ? profile.fullName!
         : widget.username;
-    final emergencyName = profile.emergencyContactName ?? 'Emergency Contact';
+    final emergencyName = hasEmergencyContact
+        ? ((profile.emergencyContactName?.trim().isNotEmpty ?? false)
+              ? profile.emergencyContactName!
+              : tr(
+                  en: 'Emergency Contact',
+                  ms: 'Kenalan Kecemasan',
+                  zh: '紧急联系人',
+                ))
+        : tr(en: 'Not Set', ms: 'Belum Ditetapkan', zh: '未设置');
     final emergencyLabel = [
       if (profile.emergencyContactRelationship?.isNotEmpty == true)
         profile.emergencyContactRelationship!,
@@ -138,36 +263,7 @@ class _ProfileTabState extends State<ProfileTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                const SizedBox(width: 40),
-                Expanded(
-                  child: Text(
-                    'Your Profile',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: titleColor,
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: IconButton(
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                    onPressed: _editProfile,
-                    icon: const Icon(Icons.settings_outlined),
-                    color: isDark
-                        ? const Color(0xFFA7B5A8)
-                        : const Color(0xFF334155),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 8),
             Center(
               child: Column(
                 children: [
@@ -183,7 +279,7 @@ class _ProfileTabState extends State<ProfileTab> {
                           ),
                         ),
                         child: CircleAvatar(
-                          radius: 56,
+                          radius: 50,
                           backgroundColor: const Color(0xFFE6EFE5),
                           child: Text(
                             widget.username.isNotEmpty
@@ -191,7 +287,7 @@ class _ProfileTabState extends State<ProfileTab> {
                                 : 'U',
                             style: const TextStyle(
                               color: primary,
-                              fontSize: 42,
+                              fontSize: 38,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -287,19 +383,27 @@ class _ProfileTabState extends State<ProfileTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
+                        Row(
                           children: [
                             Expanded(
                               child: Text(
-                                'Preparedness',
-                                style: TextStyle(
+                                tr(
+                                  en: 'Preparedness',
+                                  ms: 'Kesiapsiagaan',
+                                  zh: '应急准备',
+                                ),
+                                style: const TextStyle(
                                   color: Color(0xCCE8F5E9),
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
-                            Icon(Icons.verified, color: Colors.white, size: 14),
+                            const Icon(
+                              Icons.verified,
+                              color: Colors.white,
+                              size: 14,
+                            ),
                           ],
                         ),
                         const SizedBox(height: 6),
@@ -341,7 +445,7 @@ class _ProfileTabState extends State<ProfileTab> {
                           children: [
                             Expanded(
                               child: Text(
-                                'Contacts',
+                                tr(en: 'Contacts', ms: 'Kenalan', zh: '联系人'),
                                 style: TextStyle(
                                   color: secondaryText,
                                   fontSize: 11,
@@ -354,7 +458,13 @@ class _ProfileTabState extends State<ProfileTab> {
                         ),
                         SizedBox(height: 6),
                         Text(
-                          '3 Active',
+                          hasEmergencyContact
+                              ? tr(en: '1 Active', ms: '1 Aktif', zh: '1 个已设置')
+                              : tr(
+                                  en: 'Not Set',
+                                  ms: 'Belum Ditetapkan',
+                                  zh: '未设置',
+                                ),
                           style: TextStyle(
                             fontSize: 23,
                             fontWeight: FontWeight.bold,
@@ -362,7 +472,17 @@ class _ProfileTabState extends State<ProfileTab> {
                         ),
                         SizedBox(height: 8),
                         Text(
-                          'Last verified: 2 days ago',
+                          hasEmergencyContact
+                              ? tr(
+                                  en: 'Last verified: 2 days ago',
+                                  ms: 'Terakhir disahkan: 2 hari lalu',
+                                  zh: '最近验证：2 天前',
+                                )
+                              : tr(
+                                  en: 'Add emergency contact',
+                                  ms: 'Tambah kenalan kecemasan',
+                                  zh: '添加紧急联系人',
+                                ),
                           style: TextStyle(color: tertiaryText, fontSize: 10.5),
                         ),
                       ],
@@ -374,17 +494,24 @@ class _ProfileTabState extends State<ProfileTab> {
             const SizedBox(height: 24),
             Row(
               children: [
-                const Text(
-                  'Emergency Contacts',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                Text(
+                  tr(
+                    en: 'Emergency Contacts',
+                    ms: 'Kenalan Kecemasan',
+                    zh: '紧急联系人',
+                  ),
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const Spacer(),
                 TextButton.icon(
                   onPressed: _editProfile,
                   icon: const Icon(Icons.add, size: 16),
-                  label: const Text(
-                    'Add New',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                  label: Text(
+                    tr(en: 'Add New', ms: 'Tambah Baharu', zh: '新增'),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   style: TextButton.styleFrom(
                     foregroundColor: primary,
@@ -401,7 +528,11 @@ class _ProfileTabState extends State<ProfileTab> {
               title: emergencyName,
               subtitle: emergencyLabel.isNotEmpty
                   ? emergencyLabel
-                  : 'Primary contact • Not available',
+                  : tr(
+                      en: 'Primary contact • Not available',
+                      ms: 'Kenalan utama • Tiada maklumat',
+                      zh: '主要联系人 • 暂无信息',
+                    ),
               surface: surface,
               subtleSurface: subtleSurface,
               border: border,
@@ -412,64 +543,35 @@ class _ProfileTabState extends State<ProfileTab> {
             _buildContactTile(
               icon: Icons.health_and_safety,
               title: 'Local Community Center',
-              subtitle: 'Medical support • Emergency line',
+              subtitle: tr(
+                en: 'Medical support • Emergency line',
+                ms: 'Sokongan perubatan • Talian kecemasan',
+                zh: '医疗支援 • 紧急热线',
+              ),
               surface: surface,
               subtleSurface: subtleSurface,
               border: border,
               secondaryText: secondaryText,
               tertiaryText: tertiaryText,
             ),
-            const SizedBox(height: 24),
-            const Text(
-              'Preparedness Checklist',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: primary.withAlpha(12),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: primary.withAlpha(28)),
-              ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _ChecklistItem(
-                    checked: true,
-                    title: 'Emergency Kit Ready',
-                    subtitle:
-                        'Water, non-perishables, and first-aid kit verified.',
-                  ),
-                  SizedBox(height: 14),
-                  _ChecklistItem(
-                    checked: true,
-                    title: 'Offline Maps Downloaded',
-                    subtitle: 'Regional maps available without internet.',
-                  ),
-                  SizedBox(height: 14),
-                  _ChecklistItem(
-                    checked: false,
-                    title: 'Document Backup',
-                    subtitle:
-                        'Scan and upload identity documents for security.',
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Align(
+            const SizedBox(height: 14),
+            Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Settings',
+                tr(en: 'Settings', ms: 'Tetapan', zh: '设置'),
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
               ),
             ),
             const SizedBox(height: 8),
             _buildSettingItem(
+              icon: Icons.translate,
+              tr(en: 'Language', ms: 'Bahasa', zh: '语言'),
+              subtitle: languageController.label,
+              onTap: _selectLanguage,
+            ),
+            _buildSettingItem(
               icon: Icons.notifications,
-              'Notifications',
-              subtitle: 'Push & SMS alerts',
+              tr(en: 'Notifications', ms: 'Pemberitahuan', zh: '通知'),
               trailing: Switch(
                 value: _notificationsEnabled,
                 onChanged: (value) =>
@@ -479,13 +581,8 @@ class _ProfileTabState extends State<ProfileTab> {
               ),
             ),
             _buildSettingItem(
-              icon: Icons.translate,
-              'Language',
-              subtitle: 'English (Bahasa available)',
-            ),
-            _buildSettingItem(
               icon: Icons.dark_mode,
-              'Dark Mode',
+              tr(en: 'Dark Mode', ms: 'Mod Gelap', zh: '深色模式'),
               trailing: Switch(
                 value: themeController.isDarkMode,
                 onChanged: (value) {
@@ -499,58 +596,24 @@ class _ProfileTabState extends State<ProfileTab> {
             InkWell(
               onTap: widget.onLogout,
               borderRadius: BorderRadius.circular(12),
-              child: Container(
-                width: double.infinity,
+              child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 14,
                 ),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: const Color(0xFFFFF1F2),
-                ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.logout, color: Color(0xFFDC2626)),
-                    SizedBox(width: 10),
+                    const Icon(Icons.logout, color: Color(0xFFDC2626)),
+                    const SizedBox(width: 10),
                     Text(
-                      'Log Out',
-                      style: TextStyle(
+                      tr(en: 'Log Out', ms: 'Log Keluar', zh: '退出登录'),
+                      style: const TextStyle(
                         color: Color(0xFFDC2626),
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: border),
-              ),
-              child: Text(
-                'Medical: Blood ${profile.bloodType ?? "N/A"} • '
-                'Allergies: ${profile.allergies.isEmpty ? "None" : profile.allergies}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: secondaryText,
-                  height: 1.35,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Center(
-              child: Text(
-                'Resilience AI v1.0.0',
-                style: TextStyle(
-                  color: isDark ? const Color(0xFF8A9A8B) : Colors.grey[500],
-                  fontSize: 12,
                 ),
               ),
             ),
@@ -619,9 +682,9 @@ class _ProfileTabState extends State<ProfileTab> {
     required IconData icon,
     String? subtitle,
     Widget? trailing,
+    VoidCallback? onTap,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surface = isDark ? const Color(0xFF1B251B) : Colors.white;
     final iconColor = isDark
         ? const Color(0xFFA7B5A8)
         : const Color(0xFF475569);
@@ -633,15 +696,10 @@ class _ProfileTabState extends State<ProfileTab> {
         : const Color(0xFF94A3B8);
 
     return InkWell(
-      onTap: trailing == null ? _editProfile : null,
+      onTap: onTap ?? (trailing == null ? _editProfile : null),
       borderRadius: BorderRadius.circular(12),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 6),
+      child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: surface,
-          borderRadius: BorderRadius.circular(12),
-        ),
         child: Row(
           children: [
             Icon(icon, color: iconColor, size: 21),
@@ -669,69 +727,6 @@ class _ProfileTabState extends State<ProfileTab> {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _ChecklistItem extends StatelessWidget {
-  const _ChecklistItem({
-    required this.checked,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final bool checked;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    const Color primary = Color(0xFF2D5927);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 1),
-          child: Icon(
-            checked ? Icons.check_circle : Icons.radio_button_unchecked,
-            size: 19,
-            color: checked ? primary : const Color(0xFFCBD5E1),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: checked
-                      ? (isDark
-                            ? const Color(0xFFE8F5E9)
-                            : const Color(0xFF0F172A))
-                      : const Color(0xFF94A3B8),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: checked
-                      ? (isDark
-                            ? const Color(0xFFA7B5A8)
-                            : const Color(0xFF64748B))
-                      : const Color(0xFF94A3B8),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:disaster_resilience_ai/models/warning_model.dart';
+import 'package:disaster_resilience_ai/localization/app_language.dart';
 import 'package:disaster_resilience_ai/models/weather_model.dart';
 import 'package:disaster_resilience_ai/services/api_service.dart';
 import 'package:disaster_resilience_ai/services/weather_service.dart';
@@ -16,6 +17,7 @@ import 'package:disaster_resilience_ai/ui/chatbot_page.dart';
 import 'package:disaster_resilience_ai/models/disaster_news_model.dart';
 import 'package:disaster_resilience_ai/ui/all_warnings_page.dart';
 import 'package:disaster_resilience_ai/ui/all_news_page.dart';
+import 'package:disaster_resilience_ai/ui/widgets/landa_wordmark.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -55,6 +57,17 @@ class _HomePageState extends State<HomePage> {
   double _userLon = 103.3260;
   String _locationLabel = 'Locating...';
 
+  bool get _isMalay =>
+      AppLanguageScope.of(context).language == AppLanguage.malay;
+  bool get _isChinese =>
+      AppLanguageScope.of(context).language == AppLanguage.chinese;
+
+  String _tr({required String en, required String ms, String? zh}) {
+    if (_isMalay) return ms;
+    if (_isChinese) return zh ?? en;
+    return en;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -64,36 +77,42 @@ class _HomePageState extends State<HomePage> {
   /// Fetch the device's real GPS location, then kick off data fetches.
   Future<void> _determineLocation() async {
     try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (serviceEnabled) {
-        var permission = await Geolocator.checkPermission();
-        if (permission == LocationPermission.denied) {
-          permission = await Geolocator.requestPermission();
-        }
-        if (permission == LocationPermission.always ||
-            permission == LocationPermission.whileInUse) {
-          final position = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.medium,
-            ),
-          ).timeout(const Duration(seconds: 10));
-          if (mounted) {
-            setState(() {
-              _userLat = position.latitude;
-              _userLon = position.longitude;
-              _locationLabel =
-                  '${position.latitude.toStringAsFixed(4)}°N, ${position.longitude.toStringAsFixed(4)}°E';
-            });
-          }
-        } else {
-          if (mounted) setState(() => _locationLabel = 'Kuantan, Pahang');
-        }
-      } else {
-        if (mounted) setState(() => _locationLabel = 'Kuantan, Pahang');
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      final position = await Geolocator.getCurrentPosition();
+      if (mounted) {
+        setState(() {
+          _userLat = position.latitude;
+          _userLon = position.longitude;
+          _locationLabel = _tr(
+            en: 'Current location',
+            ms: 'Lokasi semasa',
+            zh: '当前位置',
+          );
+        });
+      }
+
+      final place = await _weatherService.fetchLocationName(
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
+      if (mounted && place != null && place.isNotEmpty) {
+        setState(() => _locationLabel = place);
       }
     } catch (_) {
       // GPS unavailable — keep fallback coordinates
-      if (mounted) setState(() => _locationLabel = 'Kuantan, Pahang');
+      if (mounted) {
+        setState(
+          () => _locationLabel = _tr(
+            en: 'Location unavailable',
+            ms: 'Lokasi tidak tersedia',
+            zh: '无法获取位置',
+          ),
+        );
+      }
     }
     _fetchWarnings();
     _updateBackendLocation();
@@ -244,6 +263,22 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildStatusSection() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleColor = isDark
+        ? const Color(0xFFE5E7EB)
+        : const Color(0xFF111827);
+    final surface = isDark ? const Color(0xFF1B251B) : Colors.white;
+    final subtleText = isDark
+        ? const Color(0xFF9AA79B)
+        : const Color(0xFF6B7280);
+    final borderColor = isDark
+        ? const Color(0xFF334236)
+        : const Color(0xFF2D5927).withAlpha(32);
+    final chipBg = isDark
+        ? const Color(0xFF2D5927).withAlpha(64)
+        : const Color(0xFF2D5927).withAlpha(16);
+    final chipFg = isDark ? const Color(0xFF9EDB94) : const Color(0xFF2D5927);
+
     final isLoaded = !_loadingWarnings;
     final hasError = _warningError != null;
     final hazards = hasError ? 0 : _nearbyWarnings.length;
@@ -253,15 +288,15 @@ class _HomePageState extends State<HomePage> {
     final IconData safetyIcon;
 
     if (!isLoaded) {
-      safetyLabel = 'Checking';
+      safetyLabel = _tr(en: 'Checking', ms: 'Menyemak', zh: '检查中');
       safetyColor = const Color(0xFF2D5927);
       safetyIcon = Icons.hourglass_top_rounded;
     } else if (hasError) {
-      safetyLabel = 'Unknown';
+      safetyLabel = _tr(en: 'Unknown', ms: 'Tidak Diketahui', zh: '未知');
       safetyColor = const Color(0xFF6B7280);
       safetyIcon = Icons.wifi_off_rounded;
     } else if (_nearbyWarnings.isEmpty) {
-      safetyLabel = 'Secure';
+      safetyLabel = _tr(en: 'Secure', ms: 'Selamat', zh: '安全');
       safetyColor = const Color(0xFF2D5927);
       safetyIcon = Icons.check_circle_rounded;
     } else {
@@ -291,13 +326,13 @@ class _HomePageState extends State<HomePage> {
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
-                'Your Status',
+                _tr(en: 'Your Status', ms: 'Status Anda', zh: '您的状态'),
                 style: TextStyle(
-                  fontSize: 22,
+                  fontSize: 20,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF111827),
+                  color: titleColor,
                 ),
               ),
             ),
@@ -310,8 +345,8 @@ class _HomePageState extends State<HomePage> {
                     : '--°C',
               ),
               style: TextButton.styleFrom(
-                backgroundColor: const Color(0xFF2D5927).withAlpha(16),
-                foregroundColor: const Color(0xFF2D5927),
+                backgroundColor: chipBg,
+                foregroundColor: chipFg,
                 shape: const StadiumBorder(),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -355,8 +390,12 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       Icon(safetyIcon, color: Colors.white, size: 30),
                       const Spacer(),
-                      const Text(
-                        'Safety Status',
+                      Text(
+                        _tr(
+                          en: 'Safety Status',
+                          ms: 'Status Keselamatan',
+                          zh: '安全状态',
+                        ),
                         style: TextStyle(color: Colors.white70, fontSize: 13),
                       ),
                       const SizedBox(height: 2),
@@ -393,11 +432,9 @@ class _HomePageState extends State<HomePage> {
                 child: Ink(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: surface,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFF2D5927).withAlpha(32),
-                    ),
+                    border: Border.all(color: borderColor),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -413,18 +450,26 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const Spacer(),
                       Text(
-                        'Active Hazards',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                        _tr(
+                          en: 'Active Hazards',
+                          ms: 'Bahaya Aktif',
+                          zh: '当前风险',
+                        ),
+                        style: TextStyle(color: subtleText, fontSize: 13),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         !isLoaded
-                            ? 'Checking'
+                            ? _tr(en: 'Checking', ms: 'Menyemak', zh: '检查中')
                             : hazards > 0
-                            ? '$hazards Nearby'
-                            : 'None',
-                        style: const TextStyle(
-                          color: Color(0xFF111827),
+                            ? _tr(
+                                en: '$hazards Nearby',
+                                ms: '$hazards Berhampiran',
+                                zh: '$hazards 个附近',
+                              )
+                            : _tr(en: 'None', ms: 'Tiada', zh: '无'),
+                        style: TextStyle(
+                          color: titleColor,
                           fontSize: 24,
                           fontWeight: FontWeight.w800,
                         ),
@@ -441,6 +486,24 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildWeatherSection() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? const Color(0xFF1B251B) : Colors.white;
+    final headingColor = isDark
+        ? const Color(0xFFE5E7EB)
+        : const Color(0xFF111827);
+    final bodyColor = isDark
+        ? const Color(0xFFB8C2BA)
+        : const Color(0xFF374151);
+    final borderColor = isDark
+        ? const Color(0xFF334236)
+        : const Color(0xFF2D5927).withAlpha(28);
+    final iconChipBg = isDark
+        ? const Color(0xFF2D5927).withAlpha(64)
+        : const Color(0xFF2D5927).withAlpha(16);
+    final iconColor = isDark
+        ? const Color(0xFF9EDB94)
+        : const Color(0xFF2D5927);
+
     final hasWeather = _weather != null;
 
     return Material(
@@ -450,9 +513,9 @@ class _HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.circular(16),
         child: Ink(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF2D5927).withAlpha(28)),
+            border: Border.all(color: borderColor),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -465,14 +528,14 @@ class _HomePageState extends State<HomePage> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF2D5927).withAlpha(16),
+                        color: iconChipBg,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
                         hasWeather
                             ? _weather!.icon
                             : Icons.thunderstorm_outlined,
-                        color: const Color(0xFF2D5927),
+                        color: iconColor,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -482,20 +545,36 @@ class _HomePageState extends State<HomePage> {
                         children: [
                           Text(
                             hasWeather
-                                ? 'Local Weather: ${_weather!.description}'
-                                : 'Local Weather Update',
-                            style: const TextStyle(
+                                ? _tr(
+                                    en: 'Local Weather: ${_weather!.description}',
+                                    ms: 'Cuaca Tempatan: ${_weather!.description}',
+                                    zh: '本地天气：${_weather!.description}',
+                                  )
+                                : _tr(
+                                    en: 'Local Weather Update',
+                                    ms: 'Kemas Kini Cuaca Tempatan',
+                                    zh: '本地天气更新',
+                                  ),
+                            style: TextStyle(
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF111827),
+                              color: headingColor,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             hasWeather
-                                ? 'Heavy rainfall risk can shift quickly. Check your nearest safe route now.'
-                                : 'Pull down to refresh the latest weather status for your location.',
+                                ? _tr(
+                                    en: 'Heavy rainfall risk can shift quickly. Check your nearest safe route now.',
+                                    ms: 'Risiko hujan lebat boleh berubah dengan cepat. Semak laluan selamat terdekat anda sekarang.',
+                                    zh: '强降雨风险可能快速变化。请立即查看最近的安全路线。',
+                                  )
+                                : _tr(
+                                    en: 'Pull down to refresh the latest weather status for your location.',
+                                    ms: 'Tarik ke bawah untuk memuat semula status cuaca terkini bagi lokasi anda.',
+                                    zh: '下拉以刷新您所在位置的最新天气状态。',
+                                  ),
                             style: TextStyle(
-                              color: Colors.grey[700],
+                              color: bodyColor,
                               fontSize: 13,
                               height: 1.35,
                             ),
@@ -563,34 +642,40 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildPrimaryActions() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleColor = isDark
+        ? const Color(0xFFE5E7EB)
+        : const Color(0xFF111827);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Quick Actions',
+        Text(
+          _tr(en: 'Quick Actions', ms: 'Tindakan Pantas', zh: '快捷操作'),
           style: TextStyle(
-            fontSize: 22,
+            fontSize: 20,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF111827),
+            color: titleColor,
           ),
         ),
         const SizedBox(height: 12),
-        GridView.count(
-          crossAxisCount: 4,
+        GridView(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
-          childAspectRatio: 0.85,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 4,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            mainAxisExtent: 90,
+          ),
           children: [
             _buildPrimaryActionChip(
-              icon: Icons.map_outlined,
-              label: 'Maps',
+              icon: Icons.map,
+              label: _tr(en: 'Maps', ms: 'Peta', zh: '地图'),
               onPressed: () => setState(() => _selectedIndex = 2),
             ),
             _buildPrimaryActionChip(
-              icon: Icons.assignment_outlined,
-              label: 'Plan',
+              icon: Icons.assignment,
+              label: _tr(en: 'Plan', ms: 'Pelan', zh: '计划'),
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -599,19 +684,22 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             _buildPrimaryActionChip(
-              icon: Icons.medical_services_outlined,
-              label: 'First Aid',
+              icon: Icons.school,
+              label: _tr(en: 'Learn', ms: 'Belajar', zh: '学习'),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ChatbotPage()),
+              ),
+            ),
+            _buildPrimaryActionChip(
+              icon: Icons.call,
+              label: _tr(en: 'SOS', ms: 'SOS', zh: '求助'),
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => const EmergencyContactsPage(),
                 ),
               ),
-            ),
-            _buildPrimaryActionChip(
-              icon: Icons.sos_outlined,
-              label: 'SOS',
-              onPressed: _openEmergencyDetails,
             ),
           ],
         ),
@@ -624,37 +712,56 @@ class _HomePageState extends State<HomePage> {
     required String label,
     required VoidCallback onPressed,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final chipBg = isDark
+        ? const Color(0xFF2D5927).withAlpha(64)
+        : const Color(0xFF2D5927).withAlpha(16);
+    final chipIcon = isDark ? const Color(0xFF9EDB94) : const Color(0xFF2D5927);
+    final labelColor = isDark
+        ? const Color(0xFFD1D5DB)
+        : const Color(0xFF111827);
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(16),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2D5927).withAlpha(16),
-                borderRadius: BorderRadius.circular(16),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: chipBg,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(icon, size: 25, color: chipIcon),
               ),
-              child: Icon(icon, color: const Color(0xFF2D5927)),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF111827),
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
+              const SizedBox(height: 6),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: labelColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildCommunityFeedSection() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleColor = isDark
+        ? const Color(0xFFE5E7EB)
+        : const Color(0xFF111827);
     final warnings = _nearbyWarnings.take(1).toList();
     final news = DisasterNewsData.articles.take(1).toList();
 
@@ -663,13 +770,13 @@ class _HomePageState extends State<HomePage> {
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
-                'Community Feed',
+                _tr(en: 'Community Feed', ms: 'Suapan Komuniti', zh: '社区动态'),
                 style: TextStyle(
-                  fontSize: 22,
+                  fontSize: 20,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF111827),
+                  color: titleColor,
                 ),
               ),
             ),
@@ -678,9 +785,9 @@ class _HomePageState extends State<HomePage> {
                 context,
                 MaterialPageRoute(builder: (_) => const AllNewsPage()),
               ),
-              child: const Text(
-                'View All',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              child: Text(
+                _tr(en: 'View All', ms: 'Lihat Semua', zh: '查看全部'),
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
           ],
@@ -688,17 +795,32 @@ class _HomePageState extends State<HomePage> {
         const SizedBox(height: 8),
         if (_loadingWarnings && warnings.isEmpty)
           _buildFeedCard(
-            source: 'Resilience AI',
-            meta: 'Updating • $_locationLabel',
-            message: 'Fetching live community updates for your area.',
+            source: 'LANDA',
+            meta: _tr(
+              en: 'Updating • $_locationLabel',
+              ms: 'Mengemas kini • $_locationLabel',
+              zh: '更新中 • $_locationLabel',
+            ),
+            message: _tr(
+              en: 'Fetching live community updates for your area.',
+              ms: 'Sedang mendapatkan kemas kini komuniti secara langsung untuk kawasan anda.',
+              zh: '正在获取您所在区域的社区实时更新。',
+            ),
             onTap: _fetchWarnings,
           ),
         if (_warningError != null && warnings.isEmpty)
           _buildFeedCard(
-            source: 'Resilience AI',
-            meta: 'Connection issue • $_locationLabel',
-            message:
-                'Unable to load warning feed right now. Pull down to retry.',
+            source: 'LANDA',
+            meta: _tr(
+              en: 'Connection issue • $_locationLabel',
+              ms: 'Masalah sambungan • $_locationLabel',
+              zh: '连接问题 • $_locationLabel',
+            ),
+            message: _tr(
+              en: 'Unable to load warning feed right now. Pull down to retry.',
+              ms: 'Tidak dapat memuatkan suapan amaran sekarang. Tarik ke bawah untuk cuba lagi.',
+              zh: '暂时无法加载警报信息流。请下拉重试。',
+            ),
             onTap: _fetchWarnings,
           ),
         ...warnings.map(
@@ -737,12 +859,26 @@ class _HomePageState extends State<HomePage> {
     required String message,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? const Color(0xFF1B251B) : Colors.white;
+    final borderColor = isDark
+        ? const Color(0xFF334236)
+        : const Color(0xFF2D5927).withAlpha(30);
+    final avatarBg = isDark
+        ? const Color(0xFF2D5927).withAlpha(64)
+        : const Color(0xFF2D5927).withAlpha(20);
+    final primaryText = isDark
+        ? const Color(0xFFE5E7EB)
+        : const Color(0xFF111827);
+    final metaText = isDark ? const Color(0xFF9AA79B) : const Color(0xFF6B7280);
+    final bodyText = isDark ? const Color(0xFFD1D5DB) : const Color(0xFF1F2937);
+
     final initial = source.isEmpty ? 'R' : source[0].toUpperCase();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: Material(
-        color: Colors.white,
+        color: surface,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           onTap: onTap,
@@ -751,7 +887,7 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF2D5927).withAlpha(30)),
+              border: Border.all(color: borderColor),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -764,12 +900,14 @@ class _HomePageState extends State<HomePage> {
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFF2D5927).withAlpha(20),
+                        color: avatarBg,
                       ),
                       child: Text(
                         initial,
-                        style: const TextStyle(
-                          color: Color(0xFF2D5927),
+                        style: TextStyle(
+                          color: isDark
+                              ? const Color(0xFF9EDB94)
+                              : const Color(0xFF2D5927),
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -781,18 +919,15 @@ class _HomePageState extends State<HomePage> {
                         children: [
                           Text(
                             source,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF111827),
+                              color: primaryText,
                             ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             meta,
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 12,
-                            ),
+                            style: TextStyle(color: metaText, fontSize: 12),
                           ),
                         ],
                       ),
@@ -800,10 +935,7 @@ class _HomePageState extends State<HomePage> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                Text(
-                  message,
-                  style: TextStyle(color: Colors.grey[800], height: 1.35),
-                ),
+                Text(message, style: TextStyle(color: bodyText, height: 1.35)),
               ],
             ),
           ),
@@ -814,9 +946,21 @@ class _HomePageState extends State<HomePage> {
 
   String _timeAgo(DateTime dt) {
     final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inMinutes < 1) {
+      return _tr(en: 'Just now', ms: 'Baru sahaja', zh: '刚刚');
+    }
+    if (diff.inMinutes < 60) {
+      if (_isMalay) return '${diff.inMinutes}m lalu';
+      if (_isChinese) return '${diff.inMinutes}分钟前';
+      return '${diff.inMinutes}m ago';
+    }
+    if (diff.inHours < 24) {
+      if (_isMalay) return '${diff.inHours}j lalu';
+      if (_isChinese) return '${diff.inHours}小时前';
+      return '${diff.inHours}h ago';
+    }
+    if (_isMalay) return '${diff.inDays}h lalu';
+    if (_isChinese) return '${diff.inDays}天前';
     return '${diff.inDays}d ago';
   }
 
@@ -845,8 +989,10 @@ class _HomePageState extends State<HomePage> {
     required IconData icon,
     required IconData selectedIcon,
   }) {
-    const Color navPrimary = Color(0xFF2D5927);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final navPrimary = isDark
+        ? const Color(0xFF86C77C)
+        : const Color(0xFF2D5927);
     final navInactive = isDark
         ? const Color(0xFF9AA79B)
         : const Color(0xFF66726A);
@@ -857,7 +1003,11 @@ class _HomePageState extends State<HomePage> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           decoration: BoxDecoration(
-            color: isSelected ? navPrimary.withAlpha(18) : Colors.transparent,
+            color: isSelected
+                ? (isDark
+                      ? const Color(0xFF2D5927).withAlpha(64)
+                      : navPrimary.withAlpha(18))
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(999),
           ),
           child: Column(
@@ -892,39 +1042,45 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pageBg = isDark ? const Color(0xFF0F140F) : const Color(0xFFF0F2F5);
+    final barBg = isDark ? const Color(0xFF1B251B) : Colors.white;
+    final borderColor = isDark
+        ? const Color(0xFF334236)
+        : const Color(0xFF2D5927).withAlpha(26);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: pageBg,
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        backgroundColor: theme.scaffoldBackgroundColor,
-        surfaceTintColor: colorScheme.surfaceTint,
+        backgroundColor: barBg,
+        foregroundColor: isDark
+            ? const Color(0xFFE5E7EB)
+            : const Color(0xFF111827),
+        surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 1,
         elevation: 0,
-        centerTitle: false,
-        titleSpacing: 16,
+        shadowColor: Colors.transparent,
+        centerTitle: true,
+        titleSpacing: 0,
         toolbarHeight: 64,
-        title: Text(
-          'Resilience AI',
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            color: colorScheme.primary,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.2,
-          ),
+        title: LandaBrandTitle(
+          wordmarkSize: 24,
+          iconColor: isDark ? const Color(0xFF86C77C) : const Color(0xFF2D5927),
+          wordmarkColors: isDark
+              ? const [Color(0xFF9EDB94), Color(0xFFE3F3DF)]
+              : const [Color(0xFF163A12), Color(0xFF2D5927)],
+          wordmarkStrokeColor: isDark
+              ? const Color(0x4D86C77C)
+              : const Color(0x991B3516),
         ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(
-            height: 1,
-            color: const Color(0xFF2D5927).withAlpha(26),
-          ),
+          child: Container(height: 1, color: borderColor),
         ),
         actions: [
           IconButton(
-            tooltip: 'Warnings',
+            tooltip: _tr(en: 'Warnings', ms: 'Amaran', zh: '警报'),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -933,7 +1089,7 @@ class _HomePageState extends State<HomePage> {
             ),
             icon: Stack(
               children: [
-                const Icon(Icons.notifications),
+                const Icon(Icons.notifications_none_rounded),
                 if (_nearbyWarnings.isNotEmpty)
                   Positioned(
                     right: 0,
@@ -950,60 +1106,64 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
-          IconButton(
-            tooltip: 'Browse News',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AllNewsPage()),
-            ),
-            icon: const Icon(Icons.search_rounded),
-          ),
           const SizedBox(width: 8),
         ],
       ),
       body: _buildBody(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ChatbotPage()),
-          );
-        },
-        backgroundColor: const Color(0xFF2E7D32),
-        tooltip: 'Disaster Assistant',
-        child: const Icon(Icons.smart_toy_rounded, color: Colors.white),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) =>
-            setState(() => _selectedIndex = index),
-        backgroundColor: colorScheme.surface,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
-        indicatorColor: Colors.transparent,
-        shadowColor: colorScheme.shadow.withAlpha(32),
-        elevation: 4,
-        destinations: [
-          _buildNavDestination(
-            label: 'Home',
-            icon: Icons.home_outlined,
-            selectedIcon: Icons.home,
-          ),
-          _buildNavDestination(
-            label: 'Reports',
-            icon: Icons.insert_chart_outlined,
-            selectedIcon: Icons.insert_chart,
-          ),
-          _buildNavDestination(
-            label: 'Map',
-            icon: Icons.map_outlined,
-            selectedIcon: Icons.map,
-          ),
-          _buildNavDestination(
-            label: 'Profile',
-            icon: Icons.person_outline,
-            selectedIcon: Icons.person,
-          ),
-        ],
+      floatingActionButton: _selectedIndex == 0
+          ? FloatingActionButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ChatbotPage()),
+                );
+              },
+              backgroundColor: const Color(0xFF2E7D32),
+              tooltip: _tr(
+                en: 'Disaster Assistant',
+                ms: 'Pembantu Bencana',
+                zh: '灾害助手',
+              ),
+              child: const Icon(Icons.smart_toy_rounded, color: Colors.white),
+            )
+          : null,
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: barBg,
+          border: Border(top: BorderSide(color: borderColor)),
+        ),
+        child: NavigationBar(
+          selectedIndex: _selectedIndex,
+          onDestinationSelected: (index) =>
+              setState(() => _selectedIndex = index),
+          backgroundColor: barBg,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+          indicatorColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          elevation: 0,
+          destinations: [
+            _buildNavDestination(
+              label: _tr(en: 'Home', ms: 'Laman', zh: '主页'),
+              icon: Icons.home_outlined,
+              selectedIcon: Icons.home,
+            ),
+            _buildNavDestination(
+              label: _tr(en: 'Reports', ms: 'Laporan', zh: '报告'),
+              icon: Icons.insert_chart_outlined,
+              selectedIcon: Icons.insert_chart,
+            ),
+            _buildNavDestination(
+              label: _tr(en: 'Map', ms: 'Peta', zh: '地图'),
+              icon: Icons.map_outlined,
+              selectedIcon: Icons.map,
+            ),
+            _buildNavDestination(
+              label: _tr(en: 'Profile', ms: 'Profil', zh: '个人'),
+              icon: Icons.person_outline,
+              selectedIcon: Icons.person,
+            ),
+          ],
+        ),
       ),
     );
   }

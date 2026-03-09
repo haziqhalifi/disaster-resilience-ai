@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:disaster_resilience_ai/models/weather_model.dart';
 import 'package:disaster_resilience_ai/services/weather_service.dart';
+import 'package:geolocator/geolocator.dart';
 
 class WeatherPage extends StatefulWidget {
   final double latitude;
@@ -24,22 +25,33 @@ class _WeatherPageState extends State<WeatherPage> {
   WeatherData? _weather;
   bool _loading = true;
   String? _error;
+  late double _activeLatitude;
+  late double _activeLongitude;
+  late String _activeLocationName;
 
   @override
   void initState() {
     super.initState();
-    _fetchWeather();
+    _activeLatitude = widget.latitude;
+    _activeLongitude = widget.longitude;
+    _activeLocationName = widget.locationName == 'Kuantan, Pahang'
+        ? 'Current location'
+        : widget.locationName;
+    _refreshFromBestLocation();
   }
 
-  Future<void> _fetchWeather() async {
+  Future<void> _fetchWeather({
+    required double latitude,
+    required double longitude,
+  }) async {
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       final data = await _weatherService.fetchWeather(
-        latitude: widget.latitude,
-        longitude: widget.longitude,
+        latitude: latitude,
+        longitude: longitude,
       );
       if (mounted) {
         setState(() {
@@ -55,6 +67,52 @@ class _WeatherPageState extends State<WeatherPage> {
         });
       }
     }
+  }
+
+  Future<bool> _applyDeviceLocation() async {
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission != LocationPermission.always &&
+          permission != LocationPermission.whileInUse) {
+        return false;
+      }
+
+      final pos = await Geolocator.getCurrentPosition();
+
+      final place = await _weatherService.fetchLocationName(
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+      );
+
+      if (!mounted) return false;
+      setState(() {
+        _activeLatitude = pos.latitude;
+        _activeLongitude = pos.longitude;
+        if (place != null && place.isNotEmpty) {
+          _activeLocationName = place;
+        }
+      });
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _refreshFromBestLocation() async {
+    final gotDeviceLocation = await _applyDeviceLocation();
+    if (!gotDeviceLocation && mounted) {
+      setState(() {
+        _activeLatitude = widget.latitude;
+        _activeLongitude = widget.longitude;
+      });
+    }
+    await _fetchWeather(
+      latitude: _activeLatitude,
+      longitude: _activeLongitude,
+    );
   }
 
   @override
@@ -83,7 +141,7 @@ class _WeatherPageState extends State<WeatherPage> {
               ),
             ),
             Text(
-              widget.locationName,
+              _activeLocationName,
               style: TextStyle(
                 color: Colors.white.withAlpha(178),
                 fontSize: 12,
@@ -94,7 +152,7 @@ class _WeatherPageState extends State<WeatherPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            onPressed: _fetchWeather,
+            onPressed: _refreshFromBestLocation,
           ),
         ],
       ),
@@ -158,7 +216,7 @@ class _WeatherPageState extends State<WeatherPage> {
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: _fetchWeather,
+                onPressed: _refreshFromBestLocation,
                 icon: const Icon(Icons.refresh_rounded),
                 label: const Text('Retry'),
                 style: ElevatedButton.styleFrom(
@@ -174,7 +232,7 @@ class _WeatherPageState extends State<WeatherPage> {
 
     final w = _weather!;
     return RefreshIndicator(
-      onRefresh: _fetchWeather,
+      onRefresh: _refreshFromBestLocation,
       color: const Color(0xFF4FC3F7),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),

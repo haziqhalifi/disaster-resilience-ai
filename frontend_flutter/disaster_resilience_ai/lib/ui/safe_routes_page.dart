@@ -6,9 +6,11 @@ class SafeRoutesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: const Color(0xFFF0F2F5),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF8F9FA),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 1,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF1E293B)),
@@ -23,6 +25,13 @@ class SafeRoutesPage extends StatelessWidget {
           ),
         ),
         centerTitle: true,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(
+            height: 1,
+            color: const Color(0xFF2D5927).withAlpha(26),
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline, color: Color(0xFF2E7D32)),
@@ -67,7 +76,11 @@ class SafeRoutesPage extends StatelessWidget {
                         color: Colors.blue,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.my_location, color: Colors.white, size: 16),
+                      child: const Icon(
+                        Icons.my_location,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                     ),
                   ),
                   Positioned(
@@ -79,14 +92,21 @@ class SafeRoutesPage extends StatelessWidget {
                         color: Color(0xFF2E7D32),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.flag, color: Colors.white, size: 16),
+                      child: const Icon(
+                        Icons.flag,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                     ),
                   ),
                   Positioned(
                     top: 20,
                     right: 20,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
@@ -94,7 +114,11 @@ class SafeRoutesPage extends StatelessWidget {
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.directions_walk, color: Color(0xFF2E7D32), size: 14),
+                          Icon(
+                            Icons.directions_walk,
+                            color: Color(0xFF2E7D32),
+                            size: 14,
+                          ),
                           SizedBox(width: 4),
                           Text(
                             '15 min walk',
@@ -260,7 +284,10 @@ class SafeRoutesPage extends StatelessWidget {
               ),
               if (isRecommended)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFE8F5E9),
                     borderRadius: BorderRadius.circular(12),
@@ -293,7 +320,10 @@ class SafeRoutesPage extends StatelessWidget {
               _buildRouteMeta(Icons.trending_up, elevation),
               const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: statusColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -319,10 +349,7 @@ class SafeRoutesPage extends StatelessWidget {
       children: [
         Icon(icon, size: 14, color: Colors.grey),
         const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(color: Colors.grey, fontSize: 12),
-        ),
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
       ],
     );
   }
@@ -362,7 +389,11 @@ class SafeRoutesPage extends StatelessWidget {
                   color: const Color(0xFFE8F5E9),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.home_filled, color: Color(0xFF2E7D32), size: 20),
+                child: const Icon(
+                  Icons.home_filled,
+                  color: Color(0xFF2E7D32),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -396,7 +427,9 @@ class SafeRoutesPage extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: percentage,
                     backgroundColor: Colors.grey[200],
-                    color: percentage > 0.7 ? Colors.orange : const Color(0xFF4CAF50),
+                    color: percentage > 0.7
+                        ? Colors.orange
+                        : const Color(0xFF4CAF50),
                     minHeight: 6,
                   ),
                 ),

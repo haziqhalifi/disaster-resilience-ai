@@ -9,6 +9,19 @@ class AllWarningsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pageBg = isDark ? const Color(0xFF0F140F) : const Color(0xFFF0F2F5);
+    final barBg = isDark ? const Color(0xFF1B251B) : Colors.white;
+    final titleColor = isDark
+        ? const Color(0xFFE5E7EB)
+        : const Color(0xFF1E293B);
+    final subtitleColor = isDark
+        ? const Color(0xFF9AA79B)
+        : const Color(0xFF64748B);
+    final dividerColor = isDark
+        ? const Color(0xFF334236)
+        : const Color(0xFF2D5927).withAlpha(26);
+
     // Sort by severity descending, then by most recent first
     final sorted = [...warnings]
       ..sort((a, b) {
@@ -19,58 +32,66 @@ class AllWarningsPage extends StatelessWidget {
       });
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: pageBg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: barBg,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 1,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(
+          icon: Icon(
             Icons.arrow_back_ios_new_rounded,
-            color: Color(0xFF2E7D32),
+            color: isDark ? const Color(0xFF9EDB94) : const Color(0xFF2E7D32),
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Active Warnings',
               style: TextStyle(
-                color: Color(0xFF1E293B),
+                color: titleColor,
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
               ),
             ),
             Text(
               '${sorted.length} warning${sorted.length == 1 ? '' : 's'} found',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              style: TextStyle(color: subtitleColor, fontSize: 12),
             ),
           ],
         ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: dividerColor),
+        ),
       ),
       body: sorted.isEmpty
-          ? const Center(
+          ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
                     Icons.check_circle_outline,
-                    color: Color(0xFF4CAF50),
+                    color: isDark
+                        ? const Color(0xFF86C77C)
+                        : const Color(0xFF4CAF50),
                     size: 64,
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   Text(
                     'No Active Warnings',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
+                      color: titleColor,
                     ),
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text(
                     'Your area is currently safe.',
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(color: subtitleColor),
                   ),
                 ],
               ),
@@ -85,37 +106,44 @@ class AllWarningsPage extends StatelessWidget {
   }
 
   Widget _buildTile(BuildContext context, Warning warning) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final Color tileColor;
     final Color borderColor;
     final Color iconColor;
+    final Color titleColor;
+    final Color metaColor;
+    final Color iconCardColor;
     final IconData icon;
 
     switch (warning.alertLevel) {
       case AlertLevel.evacuate:
-        tileColor = Colors.red[50]!;
-        borderColor = Colors.red[300]!;
-        iconColor = Colors.red[700]!;
+        tileColor = isDark ? const Color(0xFF3E1D1D) : Colors.red[50]!;
+        borderColor = isDark ? const Color(0xFF7F1D1D) : Colors.red[300]!;
+        iconColor = isDark ? const Color(0xFFFCA5A5) : Colors.red[700]!;
         icon = Icons.directions_run;
         break;
       case AlertLevel.warning:
-        tileColor = Colors.orange[50]!;
-        borderColor = Colors.orange[300]!;
-        iconColor = Colors.orange[700]!;
+        tileColor = isDark ? const Color(0xFF3B2817) : Colors.orange[50]!;
+        borderColor = isDark ? const Color(0xFF9A3412) : Colors.orange[300]!;
+        iconColor = isDark ? const Color(0xFFFDBA74) : Colors.orange[700]!;
         icon = Icons.warning_amber_rounded;
         break;
       case AlertLevel.observe:
-        tileColor = Colors.amber[50]!;
-        borderColor = Colors.amber[300]!;
-        iconColor = Colors.amber[700]!;
+        tileColor = isDark ? const Color(0xFF373018) : Colors.amber[50]!;
+        borderColor = isDark ? const Color(0xFFA16207) : Colors.amber[300]!;
+        iconColor = isDark ? const Color(0xFFFCD34D) : Colors.amber[700]!;
         icon = Icons.visibility_outlined;
         break;
       case AlertLevel.advisory:
-        tileColor = Colors.blue[50]!;
-        borderColor = Colors.blue[200]!;
-        iconColor = Colors.blue[700]!;
+        tileColor = isDark ? const Color(0xFF192A3A) : Colors.blue[50]!;
+        borderColor = isDark ? const Color(0xFF1E40AF) : Colors.blue[200]!;
+        iconColor = isDark ? const Color(0xFF93C5FD) : Colors.blue[700]!;
         icon = Icons.info_outline;
         break;
     }
+    titleColor = isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1E293B);
+    metaColor = isDark ? const Color(0xFFB8C2BA) : const Color(0xFF64748B);
+    iconCardColor = isDark ? const Color(0xFF243124) : Colors.white;
 
     return GestureDetector(
       onTap: () {
@@ -139,7 +167,7 @@ class AllWarningsPage extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: iconCardColor,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, color: iconColor, size: 24),
@@ -151,8 +179,8 @@ class AllWarningsPage extends StatelessWidget {
                 children: [
                   Text(
                     warning.title,
-                    style: const TextStyle(
-                      color: Color(0xFF1E293B),
+                    style: TextStyle(
+                      color: titleColor,
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
@@ -160,7 +188,7 @@ class AllWarningsPage extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${warning.hazardType.displayName} • ${warning.alertLevel.displayName} • ${_timeAgo(warning.createdAt)}',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    style: TextStyle(color: metaColor, fontSize: 12),
                   ),
                 ],
               ),

@@ -6,7 +6,7 @@ class ChatbotService {
     _Rule(
       keywords: ['hello', 'hi', 'hey', 'salam', 'aloha', 'helo'],
       response:
-          'Hello! 👋 I\'m your Disaster Resilience AI assistant.\n\nI can help you with:\n• Flood safety & response\n• Earthquake preparedness\n• Landslide warnings\n• Evacuation procedures\n• Emergency kit guidance\n• First aid tips\n• How to report incidents\n\nWhat would you like to know?',
+          'Hello! 👋 I\'m your LANDA assistant.\n\nI can help you with:\n• Flood safety & response\n• Earthquake preparedness\n• Landslide warnings\n• Evacuation procedures\n• Emergency kit guidance\n• First aid tips\n• How to report incidents\n\nWhat would you like to know?',
     ),
 
     // ── Flood ──────────────────────────────────────────────────────────────
