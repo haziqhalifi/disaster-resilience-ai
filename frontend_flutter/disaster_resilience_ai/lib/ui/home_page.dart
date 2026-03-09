@@ -18,6 +18,7 @@ import 'package:disaster_resilience_ai/ui/chatbot_page.dart';
 import 'package:disaster_resilience_ai/models/disaster_news_model.dart';
 import 'package:disaster_resilience_ai/ui/all_warnings_page.dart';
 import 'package:disaster_resilience_ai/ui/all_news_page.dart';
+import 'package:disaster_resilience_ai/services/notification_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -100,6 +101,27 @@ class _HomePageState extends State<HomePage> {
     _fetchWarnings();
     _updateBackendLocation();
     _fetchWeather();
+    _startNotificationPolling();
+  }
+
+  /// Begin polling for new warnings and showing local notifications.
+  void _startNotificationPolling() {
+    final notif = NotificationService.instance;
+    notif.onWarningTap = (warning) {
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EmergencyAlertPage(warning: warning),
+          ),
+        );
+      }
+    };
+    notif.startPolling(
+      accessToken: widget.accessToken,
+      latitude: _userLat,
+      longitude: _userLon,
+    );
   }
 
   Future<void> _fetchWeather() async {
@@ -119,6 +141,10 @@ class _HomePageState extends State<HomePage> {
     try {
       await _api.updateLocation(
         accessToken: widget.accessToken,
+        latitude: _userLat,
+        longitude: _userLon,
+      );
+      NotificationService.instance.updateLocation(
         latitude: _userLat,
         longitude: _userLon,
       );
@@ -222,6 +248,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _logout() async {
+    NotificationService.instance.stopPolling();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_access_token');
     await prefs.remove('auth_email');

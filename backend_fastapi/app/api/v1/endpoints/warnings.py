@@ -156,3 +156,32 @@ async def nearby_warnings(
         count=len(matched),
         warnings=[_record_to_out(r) for r in matched],
     )
+
+
+# ── GET /warnings/since — new warnings after a timestamp ─────────────────────
+
+@router.get(
+    "/since/",
+    response_model=WarningList,
+    summary="Get warnings created after a given timestamp",
+)
+async def warnings_since(
+    since: str = Query(..., description="ISO-8601 timestamp. Returns warnings created after this time."),
+    latitude: float | None = Query(None, ge=-90.0, le=90.0, description="Optional lat to filter by proximity."),
+    longitude: float | None = Query(None, ge=-180.0, le=180.0, description="Optional lon to filter by proximity."),
+) -> WarningList:
+    """Return active warnings created after *since*.
+
+    If latitude and longitude are provided, only returns warnings whose
+    affected zone covers that coordinate (hyper-local filtering).
+    """
+    records = warning_db.get_warnings_since(since)
+    if latitude is not None and longitude is not None:
+        records = [
+            r for r in records
+            if get_warnings_for_location(latitude, longitude, [r])
+        ]
+    return WarningList(
+        count=len(records),
+        warnings=[_record_to_out(r) for r in records],
+    )

@@ -313,4 +313,18 @@ class ApiService {
     }
     throw Exception(_extractErrorMessage(response));
   }
+
+  /// Generic GET that returns decoded JSON or null on failure.
+  /// Used by [NotificationService] for polling.
+  Future<Map<String, dynamic>?> httpGet(Uri uri) async {
+    try {
+      final response = await _client.get(uri);
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+    } catch (_) {
+      // Swallow — caller decides how to handle null.
+    }
+    return null;
+  }
 }
