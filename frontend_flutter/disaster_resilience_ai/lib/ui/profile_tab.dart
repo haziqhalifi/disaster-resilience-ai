@@ -76,7 +76,9 @@ class _ProfileTabState extends State<ProfileTab> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFF2E7D32)));
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
+      );
     }
 
     if (_error != null) {
@@ -88,7 +90,10 @@ class _ProfileTabState extends State<ProfileTab> {
             const SizedBox(height: 16),
             Text('Error loading profile: $_error'),
             const SizedBox(height: 16),
-            ElevatedButton(onPressed: _fetchProfile, child: const Text('Retry')),
+            ElevatedButton(
+              onPressed: _fetchProfile,
+              child: const Text('Retry'),
+            ),
           ],
         ),
       );
@@ -114,7 +119,9 @@ class _ProfileTabState extends State<ProfileTab> {
                 radius: 48,
                 backgroundColor: const Color(0xFFE8F5E9),
                 child: Text(
-                  widget.username.isNotEmpty ? widget.username[0].toUpperCase() : 'U',
+                  widget.username.isNotEmpty
+                      ? widget.username[0].toUpperCase()
+                      : 'U',
                   style: const TextStyle(
                     color: Color(0xFF2E7D32),
                     fontSize: 36,
@@ -125,7 +132,9 @@ class _ProfileTabState extends State<ProfileTab> {
             ),
             const SizedBox(height: 16),
             Text(
-              profile.fullName?.isNotEmpty == true ? profile.fullName! : widget.username,
+              profile.fullName?.isNotEmpty == true
+                  ? profile.fullName!
+                  : widget.username,
               style: const TextStyle(
                 color: Color(0xFF1E293B),
                 fontSize: 22,
@@ -197,7 +206,9 @@ class _ProfileTabState extends State<ProfileTab> {
                   onPressed: _editProfile,
                   icon: const Icon(Icons.edit, size: 18),
                   label: const Text('Edit'),
-                  style: TextButton.styleFrom(foregroundColor: const Color(0xFF2E7D32)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF2E7D32),
+                  ),
                 ),
               ],
             ),
@@ -318,10 +329,7 @@ class _ProfileTabState extends State<ProfileTab> {
           Text(
             label,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 11,
-            ),
+            style: TextStyle(color: Colors.grey[600], fontSize: 11),
           ),
         ],
       ),
@@ -403,10 +411,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: TextStyle(
-                    color: Colors.grey[500],
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
                 ),
               ],
             ),
@@ -415,7 +420,7 @@ class _ProfileTabState extends State<ProfileTab> {
             Switch(
               value: true,
               onChanged: (_) {},
-              activeColor: Colors.white,
+              activeThumbColor: Colors.white,
               activeTrackColor: const Color(0xFF2E7D32),
             )
           else

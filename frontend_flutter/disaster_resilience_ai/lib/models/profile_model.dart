@@ -1,5 +1,5 @@
 /// Data model for user profile and emergency information.
-library profile_model;
+library;
 
 class UserProfile {
   final String userId;
@@ -33,7 +33,8 @@ class UserProfile {
       allergies: json['allergies'] as String? ?? '',
       medicalConditions: json['medical_conditions'] as String? ?? '',
       emergencyContactName: json['emergency_contact_name'] as String?,
-      emergencyContactRelationship: json['emergency_contact_relationship'] as String?,
+      emergencyContactRelationship:
+          json['emergency_contact_relationship'] as String?,
       emergencyContactPhone: json['emergency_contact_phone'] as String?,
     );
   }

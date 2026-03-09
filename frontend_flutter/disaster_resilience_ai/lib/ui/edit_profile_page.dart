@@ -31,18 +31,37 @@ class _EditProfilePageState extends State<EditProfilePage> {
   String? _selectedBloodType;
   bool _saving = false;
 
-  final List<String> _bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  final List<String> _bloodTypes = [
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'AB+',
+    'AB-',
+    'O+',
+    'O-',
+  ];
 
   @override
   void initState() {
     super.initState();
     _fullNameController = TextEditingController(text: widget.profile.fullName);
     _phoneController = TextEditingController(text: widget.profile.phoneNumber);
-    _allergiesController = TextEditingController(text: widget.profile.allergies);
-    _medicalController = TextEditingController(text: widget.profile.medicalConditions);
-    _contactNameController = TextEditingController(text: widget.profile.emergencyContactName);
-    _contactRelationController = TextEditingController(text: widget.profile.emergencyContactRelationship);
-    _contactPhoneController = TextEditingController(text: widget.profile.emergencyContactPhone);
+    _allergiesController = TextEditingController(
+      text: widget.profile.allergies,
+    );
+    _medicalController = TextEditingController(
+      text: widget.profile.medicalConditions,
+    );
+    _contactNameController = TextEditingController(
+      text: widget.profile.emergencyContactName,
+    );
+    _contactRelationController = TextEditingController(
+      text: widget.profile.emergencyContactRelationship,
+    );
+    _contactPhoneController = TextEditingController(
+      text: widget.profile.emergencyContactPhone,
+    );
     _selectedBloodType = widget.profile.bloodType;
   }
 
@@ -84,9 +103,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
         Navigator.pop(context, true);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving profile: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error saving profile: $e')));
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -112,10 +131,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     ),
                   ),
                 )
-              : IconButton(
-                  icon: const Icon(Icons.check),
-                  onPressed: _save,
-                ),
+              : IconButton(icon: const Icon(Icons.check), onPressed: _save),
         ],
       ),
       body: Form(
@@ -125,38 +141,89 @@ class _EditProfilePageState extends State<EditProfilePage> {
           children: [
             const Text(
               'Personal Information',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2E7D32),
+              ),
             ),
             const SizedBox(height: 16),
-            _buildTextField('Full Name', _fullNameController, Icons.person_outline),
-            _buildTextField('Phone Number', _phoneController, Icons.phone_android, keyboardType: TextInputType.phone),
-            
+            _buildTextField(
+              'Full Name',
+              _fullNameController,
+              Icons.person_outline,
+            ),
+            _buildTextField(
+              'Phone Number',
+              _phoneController,
+              Icons.phone_android,
+              keyboardType: TextInputType.phone,
+            ),
+
             const SizedBox(height: 24),
             const Text(
               'Medical Details',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2E7D32),
+              ),
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedBloodType,
-              decoration: _inputDecoration('Blood Type', Icons.bloodtype_outlined),
-              items: _bloodTypes.map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
+              initialValue: _selectedBloodType,
+              decoration: _inputDecoration(
+                'Blood Type',
+                Icons.bloodtype_outlined,
+              ),
+              items: _bloodTypes
+                  .map(
+                    (type) => DropdownMenuItem(value: type, child: Text(type)),
+                  )
+                  .toList(),
               onChanged: (val) => setState(() => _selectedBloodType = val),
             ),
             const SizedBox(height: 16),
-            _buildTextField('Allergies', _allergiesController, Icons.warning_amber, maxLines: 2),
-            _buildTextField('Medical Conditions', _medicalController, Icons.medical_services_outlined, maxLines: 2),
-            
+            _buildTextField(
+              'Allergies',
+              _allergiesController,
+              Icons.warning_amber,
+              maxLines: 2,
+            ),
+            _buildTextField(
+              'Medical Conditions',
+              _medicalController,
+              Icons.medical_services_outlined,
+              maxLines: 2,
+            ),
+
             const SizedBox(height: 24),
             const Text(
               'Emergency Contact',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2E7D32),
+              ),
             ),
             const SizedBox(height: 16),
-            _buildTextField('Contact Name', _contactNameController, Icons.contact_emergency),
-            _buildTextField('Relationship', _contactRelationController, Icons.people_outline),
-            _buildTextField('Contact Phone', _contactPhoneController, Icons.phone, keyboardType: TextInputType.phone),
-            
+            _buildTextField(
+              'Contact Name',
+              _contactNameController,
+              Icons.contact_emergency,
+            ),
+            _buildTextField(
+              'Relationship',
+              _contactRelationController,
+              Icons.people_outline,
+            ),
+            _buildTextField(
+              'Contact Phone',
+              _contactPhoneController,
+              Icons.phone,
+              keyboardType: TextInputType.phone,
+            ),
+
             const SizedBox(height: 32),
             ElevatedButton(
               onPressed: _saving ? null : _save,
@@ -164,9 +231,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 backgroundColor: const Color(0xFF2E7D32),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-              child: const Text('SAVE PROFILE', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text(
+                'SAVE PROFILE',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),
@@ -174,8 +246,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, IconData icon, 
-      {TextInputType? keyboardType, int maxLines = 1}) {
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller,
+    IconData icon, {
+    TextInputType? keyboardType,
+    int maxLines = 1,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(

@@ -164,15 +164,13 @@ class ApiService {
     String? hazardType,
     String? alertLevel,
   }) async {
-    final params = <String, String>{
-      'active_only': activeOnly.toString(),
-    };
+    final params = <String, String>{'active_only': activeOnly.toString()};
     if (hazardType != null) params['hazard_type'] = hazardType;
     if (alertLevel != null) params['alert_level'] = alertLevel;
 
-    final uri = Uri.parse('$baseUrl/api/v1/warnings').replace(
-      queryParameters: params,
-    );
+    final uri = Uri.parse(
+      '$baseUrl/api/v1/warnings',
+    ).replace(queryParameters: params);
     final response = await _client.get(uri);
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -204,10 +202,7 @@ class ApiService {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $accessToken',
       },
-      body: jsonEncode({
-        'latitude': latitude,
-        'longitude': longitude,
-      }),
+      body: jsonEncode({'latitude': latitude, 'longitude': longitude}),
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -227,10 +222,7 @@ class ApiService {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $accessToken',
       },
-      body: jsonEncode({
-        if (fcmToken != null) 'fcm_token': fcmToken,
-        if (phoneNumber != null) 'phone_number': phoneNumber,
-      }),
+      body: jsonEncode({'fcm_token': ?fcmToken, 'phone_number': ?phoneNumber}),
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -245,9 +237,9 @@ class ApiService {
     final params = <String, String>{};
     if (hazardType != null) params['hazard_type'] = hazardType;
 
-    final uri = Uri.parse('$baseUrl/api/v1/risk-map').replace(
-      queryParameters: params.isNotEmpty ? params : null,
-    );
+    final uri = Uri.parse(
+      '$baseUrl/api/v1/risk-map',
+    ).replace(queryParameters: params.isNotEmpty ? params : null);
     final response = await _client.get(uri);
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -264,7 +256,8 @@ class ApiService {
     required double endLon,
   }) async {
     // Public OSRM API (no key required for low volume)
-    final url = 'https://router.project-osrm.org/route/v1/driving/'
+    final url =
+        'https://router.project-osrm.org/route/v1/driving/'
         '$startLon,$startLat;$endLon,$endLat?overview=full&geometries=geojson';
 
     try {
