@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 import 'package:disaster_resilience_ai/models/warning_model.dart';
@@ -235,126 +237,142 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildDashboard() {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return RefreshIndicator(
       onRefresh: _fetchWarnings,
       color: colorScheme.primary,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildGreetingBanner(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 12),
-                  _buildStatusCard(),
-                  const SizedBox(height: 12),
-                  _buildPrimaryActions(),
-                  const SizedBox(height: 26),
-                  // ── Active Warnings section (max 3) ──────────────────
-                  _buildSectionHeader(
-                    'Active Warnings',
-                    _allActiveWarnings.isEmpty
-                        ? null
-                        : 'View All (${_allActiveWarnings.length})',
-                    _allActiveWarnings.isEmpty
-                        ? null
-                        : () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  AllWarningsPage(warnings: _allActiveWarnings),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -140,
+            right: -80,
+            child: _softOrb(colorScheme.primary.withAlpha(32), 260),
+          ),
+          Positioned(
+            top: 220,
+            left: -90,
+            child: _softOrb(colorScheme.tertiary.withAlpha(24), 220),
+          ),
+          SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildGreetingBanner(),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 16),
+                      _buildStatusCard(),
+                      const SizedBox(height: 12),
+                      _buildPrimaryActions(),
+                      const SizedBox(height: 20),
+                      // ── Active Warnings section (max 3) ──────────────────
+                      _buildSectionHeader(
+                        'Active Warnings',
+                        _allActiveWarnings.isEmpty
+                            ? null
+                            : 'View All (${_allActiveWarnings.length})',
+                        _allActiveWarnings.isEmpty
+                            ? null
+                            : () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AllWarningsPage(
+                                    warnings: _allActiveWarnings,
+                                  ),
+                                ),
+                              ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildWarningsSection(),
+                      const SizedBox(height: 20),
+                      // ── Disaster News & Info section (max 3) ─────────────
+                      _buildSectionHeader(
+                        'Disaster News & Info',
+                        'View All',
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AllNewsPage(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildNewsSection(),
+                      const SizedBox(height: 20),
+                      // ── Quick Actions ─────────────────────────────────────
+                      _buildSectionHeader('Preparedness Tools', null, null),
+                      const SizedBox(height: 12),
+                      GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 1.1,
+                        children: [
+                          _buildActionCard(
+                            icon: Icons.campaign_outlined,
+                            title: 'Community Report',
+                            subtitle: 'Submit local updates',
+                            accentColor: Colors.orange,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SubmitReportPage(),
+                              ),
                             ),
                           ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildWarningsSection(),
-                  const SizedBox(height: 24),
-                  // ── Disaster News & Info section (max 3) ─────────────
-                  _buildSectionHeader(
-                    'Disaster News & Info',
-                    'View All',
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const AllNewsPage()),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildNewsSection(),
-                  const SizedBox(height: 24),
-                  // ── Quick Actions ─────────────────────────────────────
-                  _buildSectionHeader('Preparedness Tools', null, null),
-                  const SizedBox(height: 12),
-                  GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 1.1,
-                    children: [
-                      _buildActionCard(
-                        icon: Icons.campaign_outlined,
-                        title: 'Community Report',
-                        subtitle: 'Submit local updates',
-                        accentColor: Colors.orange,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const SubmitReportPage(),
+                          _buildActionCard(
+                            icon: Icons.school_outlined,
+                            title: 'School Registry',
+                            subtitle: 'Track school readiness',
+                            accentColor: Colors.indigo,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SchoolPreparednessPage(),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      _buildActionCard(
-                        icon: Icons.school_outlined,
-                        title: 'School Registry',
-                        subtitle: 'Track school readiness',
-                        accentColor: Colors.indigo,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const SchoolPreparednessPage(),
+                          _buildActionCard(
+                            icon: Icons.directions_run,
+                            title: 'Safe Routes',
+                            subtitle: 'Fastest evacuation path',
+                            accentColor: Colors.green,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SafeRoutesPage(),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      _buildActionCard(
-                        icon: Icons.directions_run,
-                        title: 'Safe Routes',
-                        subtitle: 'Fastest evacuation path',
-                        accentColor: Colors.green,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const SafeRoutesPage(),
+                          _buildActionCard(
+                            icon: Icons.phone_outlined,
+                            title: 'Emergency Contacts',
+                            subtitle: 'Critical numbers nearby',
+                            accentColor: Colors.red,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const EmergencyContactsPage(),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                      _buildActionCard(
-                        icon: Icons.phone_outlined,
-                        title: 'Emergency Contacts',
-                        subtitle: 'Critical numbers nearby',
-                        accentColor: Colors.red,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const EmergencyContactsPage(),
-                          ),
-                        ),
-                      ),
+                      const SizedBox(height: 24),
                     ],
                   ),
-                  const SizedBox(height: 32),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -373,22 +391,16 @@ class _HomePageState extends State<HomePage> {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.primaryContainer,
-            colorScheme.tertiaryContainer.withAlpha(224),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
+        color: Colors.white.withAlpha(145),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withAlpha(170)),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withAlpha(18),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+            color: colorScheme.shadow.withAlpha(10),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -405,31 +417,31 @@ class _HomePageState extends State<HomePage> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: colorScheme.onPrimaryContainer.withAlpha(30),
+                    color: Colors.white.withAlpha(120),
                     borderRadius: BorderRadius.circular(30),
                   ),
                   child: Text(
                     'LIVE MONITORING',
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onPrimaryContainer,
-                      fontWeight: FontWeight.w700,
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w600,
                       letterSpacing: 0.5,
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 Text(
                   '$greeting, ${widget.username} 👋',
                   style: theme.textTheme.titleLarge?.copyWith(
-                    color: colorScheme.onPrimaryContainer,
-                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Text(
                   'Your community resilience command center',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onPrimaryContainer.withAlpha(220),
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -439,7 +451,7 @@ class _HomePageState extends State<HomePage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: colorScheme.surface.withAlpha(150),
+              color: Colors.white.withAlpha(120),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -447,14 +459,14 @@ class _HomePageState extends State<HomePage> {
                 Icon(
                   Icons.wifi_tethering_rounded,
                   size: 18,
-                  color: colorScheme.onPrimaryContainer,
+                  color: colorScheme.primary,
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Online',
                   style: theme.textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onPrimaryContainer,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.primary,
                   ),
                 ),
               ],
@@ -478,7 +490,7 @@ class _HomePageState extends State<HomePage> {
           title,
           style: Theme.of(
             context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
         ),
         if (actionLabel != null && onAction != null)
           TextButton(
@@ -497,13 +509,10 @@ class _HomePageState extends State<HomePage> {
   Widget _buildPrimaryActions() {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
+    return _glassSurface(
       padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
+      borderRadius: 18,
+      border: Border.all(color: colorScheme.outlineVariant.withAlpha(120)),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
@@ -570,13 +579,13 @@ class _HomePageState extends State<HomePage> {
     final colorScheme = Theme.of(context).colorScheme;
     final textStyle = Theme.of(
       context,
-    ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700);
+    ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600);
 
     final buttonStyle = OutlinedButton.styleFrom(
       foregroundColor: colorScheme.onSurface,
       side: BorderSide(color: colorScheme.outlineVariant),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       textStyle: textStyle,
     );
 
@@ -590,7 +599,7 @@ class _HomePageState extends State<HomePage> {
           foregroundColor: colorScheme.onPrimary,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
           ),
           textStyle: textStyle,
         ),
@@ -867,7 +876,7 @@ class _HomePageState extends State<HomePage> {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
         children: [
@@ -1065,20 +1074,13 @@ class _HomePageState extends State<HomePage> {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
+      borderRadius: BorderRadius.circular(18),
+      child: _glassSurface(
+        borderRadius: 16,
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: colorScheme.outlineVariant, width: 1),
-          boxShadow: [
-            BoxShadow(
-              color: colorScheme.shadow.withAlpha(12),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
+        border: Border.all(
+          color: colorScheme.outlineVariant.withAlpha(120),
+          width: 1,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1096,7 +1098,7 @@ class _HomePageState extends State<HomePage> {
               title,
               style: TextStyle(
                 color: colorScheme.onSurface,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
                 fontSize: 15,
               ),
             ),
@@ -1140,10 +1142,10 @@ class _HomePageState extends State<HomePage> {
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerLowest,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        backgroundColor: colorScheme.surface,
+        backgroundColor: Colors.white.withAlpha(190),
         surfaceTintColor: colorScheme.surfaceTint,
         scrolledUnderElevation: 1,
         elevation: 0,
@@ -1155,7 +1157,7 @@ class _HomePageState extends State<HomePage> {
           overflow: TextOverflow.ellipsis,
           style: theme.textTheme.headlineSmall?.copyWith(
             color: colorScheme.primary,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             letterSpacing: 0.2,
           ),
         ),
@@ -1182,8 +1184,9 @@ class _HomePageState extends State<HomePage> {
                     : '--°C',
               ),
               style: TextButton.styleFrom(
-                backgroundColor: colorScheme.secondaryContainer,
-                foregroundColor: colorScheme.onSecondaryContainer,
+                backgroundColor: Colors.white.withAlpha(175),
+                foregroundColor: colorScheme.primary,
+                side: BorderSide(color: Colors.white.withAlpha(165)),
                 shape: const StadiumBorder(),
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -1212,10 +1215,10 @@ class _HomePageState extends State<HomePage> {
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) =>
             setState(() => _selectedIndex = index),
-        backgroundColor: colorScheme.surfaceContainerHigh,
-        indicatorColor: colorScheme.secondaryContainer,
-        shadowColor: colorScheme.shadow.withAlpha(32),
-        elevation: 4,
+        backgroundColor: Colors.white.withAlpha(190),
+        indicatorColor: colorScheme.primary.withAlpha(24),
+        shadowColor: colorScheme.shadow.withAlpha(24),
+        elevation: 0,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
@@ -1238,6 +1241,45 @@ class _HomePageState extends State<HomePage> {
             label: 'Profile',
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _glassSurface({
+    required Widget child,
+    EdgeInsetsGeometry? padding,
+    double borderRadius = 20,
+    Border? border,
+  }) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          padding: padding,
+          decoration: BoxDecoration(
+            color: Colors.white.withAlpha(122),
+            borderRadius: BorderRadius.circular(borderRadius),
+            border: border ?? Border.all(color: Colors.white.withAlpha(165)),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  Widget _softOrb(Color color, double size) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [color, color.withAlpha(0)],
+            stops: const [0.05, 1],
+          ),
+        ),
       ),
     );
   }
