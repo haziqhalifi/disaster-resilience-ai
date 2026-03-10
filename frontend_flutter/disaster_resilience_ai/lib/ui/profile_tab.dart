@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:disaster_resilience_ai/models/profile_model.dart';
+import 'package:disaster_resilience_ai/localization/app_language.dart';
 import 'package:disaster_resilience_ai/services/api_service.dart';
+import 'package:disaster_resilience_ai/theme/app_theme.dart';
 import 'package:disaster_resilience_ai/services/notification_service.dart';
 import 'package:disaster_resilience_ai/ui/edit_profile_page.dart';
 import 'package:disaster_resilience_ai/ui/family_tab.dart';
@@ -28,11 +30,109 @@ class _ProfileTabState extends State<ProfileTab> {
   UserProfile? _profile;
   bool _loading = true;
   String? _error;
+  bool _notificationsEnabled = true;
 
   @override
   void initState() {
     super.initState();
     _fetchProfile();
+  }
+
+  Future<void> _selectLanguage() async {
+    final languageController = AppLanguageScope.of(context);
+    final selectedLanguage = languageController.label;
+    final currentLanguage = languageController.language;
+    String tr({required String en, required String ms, required String zh}) {
+      return switch (currentLanguage) {
+        AppLanguage.english => en,
+        AppLanguage.malay => ms,
+        AppLanguage.chinese => zh,
+      };
+    }
+
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final subtitleColor = isDark
+            ? const Color(0xFFA7B5A8)
+            : const Color(0xFF64748B);
+        final checkColor = isDark
+            ? const Color(0xFFD1D5DB)
+            : const Color(0xFF475569);
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: Text(
+                  tr(en: 'Choose Language', ms: 'Pilih Bahasa', zh: '选择语言'),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              ListTile(
+                title: const Text('English'),
+                subtitle: Text(
+                  tr(
+                    en: 'Use English across the app',
+                    ms: 'Guna bahasa Inggeris dalam aplikasi',
+                    zh: '在整个应用中使用英语',
+                  ),
+                  style: TextStyle(color: subtitleColor),
+                ),
+                trailing: selectedLanguage == 'English'
+                    ? Icon(Icons.check, color: checkColor)
+                    : null,
+                onTap: () => Navigator.pop(context, 'English'),
+              ),
+              ListTile(
+                title: const Text('Bahasa Melayu'),
+                subtitle: Text(
+                  tr(
+                    en: 'Use Bahasa Melayu across the app',
+                    ms: 'Guna Bahasa Melayu dalam aplikasi',
+                    zh: '在整个应用中使用马来语',
+                  ),
+                  style: TextStyle(color: subtitleColor),
+                ),
+                trailing: selectedLanguage == 'Bahasa Melayu'
+                    ? Icon(Icons.check, color: checkColor)
+                    : null,
+                onTap: () => Navigator.pop(context, 'Bahasa Melayu'),
+              ),
+              ListTile(
+                title: const Text('Chinese (Mandarin)'),
+                subtitle: Text(
+                  tr(
+                    en: 'Use Mandarin Chinese across the app',
+                    ms: 'Guna Bahasa Cina Mandarin dalam aplikasi',
+                    zh: '在整个应用中使用普通话',
+                  ),
+                  style: TextStyle(color: subtitleColor),
+                ),
+                trailing: selectedLanguage == 'Chinese (Mandarin)'
+                    ? Icon(Icons.check, color: checkColor)
+                    : null,
+                onTap: () => Navigator.pop(context, 'Chinese (Mandarin)'),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (selected == null || selected == selectedLanguage) return;
+    if (selected == 'Bahasa Melayu') {
+      await languageController.setLanguage(AppLanguage.malay);
+      return;
+    }
+    if (selected == 'Chinese (Mandarin)') {
+      await languageController.setLanguage(AppLanguage.chinese);
+      return;
+    }
+    await languageController.setLanguage(AppLanguage.english);
   }
 
   Future<void> _fetchProfile() async {
@@ -77,10 +177,35 @@ class _ProfileTabState extends State<ProfileTab> {
 
   @override
   Widget build(BuildContext context) {
+    const Color primary = Color(0xFF2D5927);
+    final theme = Theme.of(context);
+    final themeController = AppThemeScope.of(context);
+    final languageController = AppLanguageScope.of(context);
+    final language = languageController.language;
+    String tr({required String en, required String ms, required String zh}) {
+      return switch (language) {
+        AppLanguage.english => en,
+        AppLanguage.malay => ms,
+        AppLanguage.chinese => zh,
+      };
+    }
+
+    final isDark = theme.brightness == Brightness.dark;
+    final pageBg = theme.scaffoldBackgroundColor;
+    final surface = isDark ? const Color(0xFF1B251B) : Colors.white;
+    final subtleSurface = isDark
+        ? const Color(0xFF233124)
+        : const Color(0xFFF1F5F9);
+    final border = isDark ? const Color(0xFF334236) : const Color(0xFFE2E8F0);
+    final secondaryText = isDark
+        ? const Color(0xFFA7B5A8)
+        : const Color(0xFF64748B);
+    final tertiaryText = isDark
+        ? const Color(0xFF8A9A8B)
+        : const Color(0xFF94A3B8);
+
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF2E7D32)),
-      );
+      return const Center(child: CircularProgressIndicator(color: primary));
     }
 
     if (_error != null) {
@@ -90,11 +215,17 @@ class _ProfileTabState extends State<ProfileTab> {
           children: [
             const Icon(Icons.error_outline, size: 48, color: Colors.red),
             const SizedBox(height: 16),
-            Text('Error loading profile: $_error'),
+            Text(
+              tr(
+                en: 'Error loading profile: $_error',
+                ms: 'Ralat memuatkan profil: $_error',
+                zh: '加载个人资料出错：$_error',
+              ),
+            ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _fetchProfile,
-              child: const Text('Retry'),
+              child: Text(tr(en: 'Retry', ms: 'Cuba Lagi', zh: '重试')),
             ),
           ],
         ),
@@ -102,221 +233,404 @@ class _ProfileTabState extends State<ProfileTab> {
     }
 
     final profile = _profile!;
+    final hasEmergencyContact =
+        (profile.emergencyContactName?.trim().isNotEmpty ?? false) ||
+        (profile.emergencyContactPhone?.trim().isNotEmpty ?? false) ||
+        (profile.emergencyContactRelationship?.trim().isNotEmpty ?? false);
+    final displayName = profile.fullName?.isNotEmpty == true
+        ? profile.fullName!
+        : widget.username;
+    final emergencyName = hasEmergencyContact
+        ? ((profile.emergencyContactName?.trim().isNotEmpty ?? false)
+              ? profile.emergencyContactName!
+              : tr(
+                  en: 'Emergency Contact',
+                  ms: 'Kenalan Kecemasan',
+                  zh: '紧急联系人',
+                ))
+        : tr(en: 'Not Set', ms: 'Belum Ditetapkan', zh: '未设置');
+    final emergencyLabel = [
+      if (profile.emergencyContactRelationship?.isNotEmpty == true)
+        profile.emergencyContactRelationship!,
+      if (profile.emergencyContactPhone?.isNotEmpty == true)
+        profile.emergencyContactPhone!,
+    ].join(' • ');
+    final resilienceId =
+        'RAI-${profile.userId.replaceAll(RegExp(r'[^0-9A-Za-z]'), '').toUpperCase().padLeft(4, '0').substring(0, 4)}';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: pageBg,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 16),
-            // Avatar
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF2E7D32), width: 3),
-              ),
-              child: CircleAvatar(
-                radius: 48,
-                backgroundColor: const Color(0xFFE8F5E9),
-                child: Text(
-                  widget.username.isNotEmpty
-                      ? widget.username[0].toUpperCase()
-                      : 'U',
-                  style: const TextStyle(
-                    color: Color(0xFF2E7D32),
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              profile.fullName?.isNotEmpty == true
-                  ? profile.fullName!
-                  : widget.username,
-              style: const TextStyle(
-                color: Color(0xFF1E293B),
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              widget.email,
-              style: const TextStyle(color: Colors.grey, fontSize: 14),
-            ),
             const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text(
-                'Community Volunteer',
-                style: TextStyle(
-                  color: Color(0xFF2E7D32),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            // Stats Row
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
+            Center(
+              child: Column(
                 children: [
-                  _buildStatColumn('14', 'Reports\nSubmitted'),
-                  Container(width: 1, height: 40, color: Colors.grey[200]),
-                  _buildStatColumn('3', 'Drills\nCompleted'),
-                  Container(width: 1, height: 40, color: Colors.grey[200]),
-                  _buildStatColumn('89%', 'Accuracy\nScore'),
+                  Stack(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: primary.withAlpha(38),
+                            width: 4,
+                          ),
+                        ),
+                        child: CircleAvatar(
+                          radius: 50,
+                          backgroundColor: const Color(0xFFE6EFE5),
+                          child: Text(
+                            widget.username.isNotEmpty
+                                ? widget.username[0].toUpperCase()
+                                : 'U',
+                            style: const TextStyle(
+                              color: primary,
+                              fontSize: 38,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: 2,
+                        bottom: 2,
+                        child: InkWell(
+                          onTap: _editProfile,
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: const BoxDecoration(
+                              color: primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.edit,
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    displayName,
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(Icons.location_on, size: 15, color: primary),
+                      SizedBox(width: 4),
+                      Text(
+                        'Dengkil, Selangor',
+                        style: TextStyle(
+                          color: primary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: primary.withAlpha(22),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      'Resilience ID: $resilienceId',
+                      style: const TextStyle(
+                        color: primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 24),
-
-            // Emergency Info Section
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Emergency Info',
-                  style: TextStyle(
-                    color: Color(0xFF1E293B),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: primary,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: primary.withAlpha(46),
+                          blurRadius: 16,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                tr(
+                                  en: 'Preparedness',
+                                  ms: 'Kesiapsiagaan',
+                                  zh: '应急准备',
+                                ),
+                                style: const TextStyle(
+                                  color: Color(0xCCE8F5E9),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            const Icon(
+                              Icons.verified,
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          '85%',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: LinearProgressIndicator(
+                            value: 0.85,
+                            minHeight: 5,
+                            color: Colors.white,
+                            backgroundColor: Colors.white24,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                TextButton.icon(
-                  onPressed: _editProfile,
-                  icon: const Icon(Icons.edit, size: 18),
-                  label: const Text('Edit'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF2E7D32),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: border),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                tr(en: 'Contacts', ms: 'Kenalan', zh: '联系人'),
+                                style: TextStyle(
+                                  color: secondaryText,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Icon(Icons.emergency, color: primary, size: 14),
+                          ],
+                        ),
+                        SizedBox(height: 6),
+                        Text(
+                          hasEmergencyContact
+                              ? tr(en: '1 Active', ms: '1 Aktif', zh: '1 个已设置')
+                              : tr(
+                                  en: 'Not Set',
+                                  ms: 'Belum Ditetapkan',
+                                  zh: '未设置',
+                                ),
+                          style: TextStyle(
+                            fontSize: 23,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          hasEmergencyContact
+                              ? tr(
+                                  en: 'Last verified: 2 days ago',
+                                  ms: 'Terakhir disahkan: 2 hari lalu',
+                                  zh: '最近验证：2 天前',
+                                )
+                              : tr(
+                                  en: 'Add emergency contact',
+                                  ms: 'Tambah kenalan kecemasan',
+                                  zh: '添加紧急联系人',
+                                ),
+                          style: TextStyle(color: tertiaryText, fontSize: 10.5),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.red[50],
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.red[200]!, width: 1),
-              ),
-              child: Column(
-                children: [
-                  _buildEmergencyDetail(
-                    Icons.medical_information,
-                    'Medical Info',
-                    'Blood Type: ${profile.bloodType ?? "N/A"} • Allergies: ${profile.allergies.isEmpty ? "None" : profile.allergies}',
-                  ),
-                  const SizedBox(height: 12),
-                  const Divider(),
-                  const SizedBox(height: 12),
-                  _buildEmergencyDetail(
-                    Icons.phone,
-                    'Emergency Contact',
-                    profile.emergencyContactName != null
-                        ? '${profile.emergencyContactName} • ${profile.emergencyContactPhone}'
-                        : 'Not set',
-                  ),
-                ],
-              ),
-            ),
             const SizedBox(height: 24),
-
-            // Settings Section
-            const Align(
+            Row(
+              children: [
+                Text(
+                  tr(
+                    en: 'Emergency Contacts',
+                    ms: 'Kenalan Kecemasan',
+                    zh: '紧急联系人',
+                  ),
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: _editProfile,
+                  icon: const Icon(Icons.add, size: 16),
+                  label: Text(
+                    tr(en: 'Add New', ms: 'Tambah Baharu', zh: '新增'),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: primary,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _buildContactTile(
+              icon: Icons.person,
+              title: emergencyName,
+              subtitle: emergencyLabel.isNotEmpty
+                  ? emergencyLabel
+                  : tr(
+                      en: 'Primary contact • Not available',
+                      ms: 'Kenalan utama • Tiada maklumat',
+                      zh: '主要联系人 • 暂无信息',
+                    ),
+              surface: surface,
+              subtleSurface: subtleSurface,
+              border: border,
+              secondaryText: secondaryText,
+              tertiaryText: tertiaryText,
+            ),
+            const SizedBox(height: 10),
+            _buildContactTile(
+              icon: Icons.health_and_safety,
+              title: 'Local Community Center',
+              subtitle: tr(
+                en: 'Medical support • Emergency line',
+                ms: 'Sokongan perubatan • Talian kecemasan',
+                zh: '医疗支援 • 紧急热线',
+              ),
+              surface: surface,
+              subtleSurface: subtleSurface,
+              border: border,
+              secondaryText: secondaryText,
+              tertiaryText: tertiaryText,
+            ),
+            const SizedBox(height: 14),
+            Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Settings',
-                style: TextStyle(
-                  color: Color(0xFF1E293B),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
+                tr(en: 'Settings', ms: 'Tetapan', zh: '设置'),
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
               ),
             ),
-            const SizedBox(height: 16),
-
+            const SizedBox(height: 8),
             _buildSettingItem(
-              Icons.notifications_outlined,
-              'Notifications',
-              'Push & SMS Alerts',
-              true,
-              onTap: () {},
+              tr(en: 'Language', ms: 'Bahasa', zh: '语言'),
+              icon: Icons.translate,
+              subtitle: languageController.label,
+              onTap: _selectLanguage,
             ),
             _buildSettingItem(
-              Icons.notifications_active_outlined,
-              'Test Notification',
-              'Send a test alert to verify notifications work',
-              false,
+              tr(en: 'Notifications', ms: 'Pemberitahuan', zh: '通知'),
+              icon: Icons.notifications,
+              trailing: Switch(
+                value: _notificationsEnabled,
+                onChanged: (value) =>
+                    setState(() => _notificationsEnabled = value),
+                activeTrackColor: primary.withAlpha(120),
+                activeThumbColor: primary,
+              ),
+            ),
+            _buildSettingItem(
+              tr(en: 'Test Notification', ms: 'Uji Pemberitahuan', zh: '测试通知'),
+              icon: Icons.notifications_active_outlined,
+              subtitle: tr(
+                en: 'Send a test alert to verify notifications work',
+                ms: 'Hantar amaran ujian untuk sahkan pemberitahuan',
+                zh: '发送测试提醒以验证通知功能',
+              ),
               onTap: () async {
                 try {
                   await NotificationService.instance.showTestNotification();
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Test notification sent — check your notification tray',
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        tr(
+                          en: 'Test notification sent',
+                          ms: 'Pemberitahuan ujian dihantar',
+                          zh: '测试通知已发送',
                         ),
-                        duration: Duration(seconds: 3),
                       ),
-                    );
-                  }
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
                 } catch (_) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Notifications are not supported on this platform',
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        tr(
+                          en: 'Notifications are not supported on this platform',
+                          ms: 'Pemberitahuan tidak disokong pada platform ini',
+                          zh: '此平台不支持通知',
                         ),
-                        duration: Duration(seconds: 3),
                       ),
-                    );
-                  }
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
                 }
               },
             ),
             _buildSettingItem(
-              Icons.language,
-              'Language',
-              'English',
-              false,
-              onTap: () {},
-            ),
-            _buildSettingItem(
-              Icons.location_on_outlined,
-              'Residency',
-              'Dengkil, Selangor',
-              false,
-              onTap: () {},
-            ),
-            _buildSettingItem(
-              Icons.group_outlined,
-              'Family',
-              'Manage family & live location sharing',
-              false,
+              tr(en: 'Family', ms: 'Keluarga', zh: '家人'),
+              icon: Icons.group_outlined,
+              subtitle: tr(
+                en: 'Manage family & live location sharing',
+                ms: 'Urus keluarga & perkongsian lokasi langsung',
+                zh: '管理家庭与实时位置共享',
+              ),
               onTap: () {
                 Navigator.push(
                   context,
@@ -326,124 +640,78 @@ class _ProfileTabState extends State<ProfileTab> {
                 );
               },
             ),
-
-            const SizedBox(height: 32),
-
-            // Logout Button
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: widget.onLogout,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red[700],
-                  side: BorderSide(color: Colors.red[300]!),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+            _buildSettingItem(
+              tr(en: 'Dark Mode', ms: 'Mod Gelap', zh: '深色模式'),
+              icon: Icons.dark_mode,
+              trailing: Switch(
+                value: themeController.isDarkMode,
+                onChanged: (value) {
+                  themeController.setDarkMode(value);
+                },
+                activeTrackColor: primary.withAlpha(120),
+                activeThumbColor: primary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: widget.onLogout,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 14,
                 ),
-                icon: const Icon(Icons.logout),
-                label: const Text(
-                  'Sign Out',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                child: Row(
+                  children: [
+                    const Icon(Icons.logout, color: Color(0xFFDC2626)),
+                    const SizedBox(width: 10),
+                    Text(
+                      tr(en: 'Log Out', ms: 'Log Keluar', zh: '退出登录'),
+                      style: const TextStyle(
+                        color: Color(0xFFDC2626),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Resilience AI v1.0.0',
-              style: TextStyle(color: Colors.grey[400], fontSize: 12),
-            ),
-            const SizedBox(height: 32),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatColumn(String value, String label) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: const TextStyle(
-              color: Color(0xFF2E7D32),
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey[600], fontSize: 11),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmergencyDetail(IconData icon, String title, String subtitle) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.red[100],
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, color: Colors.red[700]),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Color(0xFF1E293B),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-              Text(
-                subtitle,
-                style: TextStyle(color: Colors.grey[600], fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSettingItem(
-    IconData icon,
-    String title,
-    String subtitle,
-    bool hasToggle, {
-    VoidCallback? onTap,
+  Widget _buildContactTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color surface,
+    required Color subtleSurface,
+    required Color border,
+    required Color secondaryText,
+    required Color tertiaryText,
   }) {
-    final content = Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(16),
+    return Container(
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: surface,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: const Color(0xFFE8F5E9),
-              borderRadius: BorderRadius.circular(8),
+              color: subtleSurface,
+              borderRadius: BorderRadius.circular(999),
             ),
-            child: Icon(icon, color: const Color(0xFF2E7D32), size: 20),
+            child: Icon(icon, color: secondaryText, size: 20),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -451,40 +719,74 @@ class _ProfileTabState extends State<ProfileTab> {
                 Text(
                   title,
                   style: const TextStyle(
-                    color: Color(0xFF1E293B),
-                    fontWeight: FontWeight.bold,
                     fontSize: 14,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 1),
                 Text(
                   subtitle,
-                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                  style: TextStyle(fontSize: 12, color: secondaryText),
                 ),
               ],
             ),
           ),
-          if (hasToggle)
-            Switch(
-              value: true,
-              onChanged: (_) {},
-              activeThumbColor: Colors.white,
-              activeTrackColor: const Color(0xFF2E7D32),
-            )
-          else
-            Icon(Icons.chevron_right, color: Colors.grey[400]),
+          Icon(Icons.chevron_right, color: tertiaryText),
         ],
       ),
     );
+  }
 
-    if (onTap == null) {
-      return content;
-    }
+  Widget _buildSettingItem(
+    String title, {
+    required IconData icon,
+    String? subtitle,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final iconColor = isDark
+        ? const Color(0xFFA7B5A8)
+        : const Color(0xFF475569);
+    final subtitleColor = isDark
+        ? const Color(0xFFA7B5A8)
+        : const Color(0xFF64748B);
+    final tertiaryText = isDark
+        ? const Color(0xFF8A9A8B)
+        : const Color(0xFF94A3B8);
 
     return InkWell(
-      onTap: onTap,
+      onTap: onTap ?? (trailing == null ? _editProfile : null),
       borderRadius: BorderRadius.circular(12),
-      child: content,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 21),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (subtitle != null)
+                    Text(
+                      subtitle,
+                      style: TextStyle(fontSize: 12, color: subtitleColor),
+                    ),
+                ],
+              ),
+            ),
+            trailing ?? Icon(Icons.chevron_right, color: tertiaryText),
+          ],
+        ),
+      ),
     );
   }
 }

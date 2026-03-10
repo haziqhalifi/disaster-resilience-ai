@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:disaster_resilience_ai/localization/app_language.dart';
 import 'package:disaster_resilience_ai/services/chatbot_service.dart';
+import 'package:disaster_resilience_ai/ui/widgets/landa_wordmark.dart';
 
 enum _Sender { user, bot }
 
@@ -27,6 +30,8 @@ class _ChatbotPageState extends State<ChatbotPage>
   final _scrollController = ScrollController();
   final List<_ChatMessage> _messages = [];
   bool _isTyping = false;
+  bool _isScrolled = false;
+  bool _welcomeInitialized = false;
 
   static const _botGreen = Color(0xFF2E7D32);
   static const _botBubble = Color(0xFFE8F5E9);
@@ -35,21 +40,63 @@ class _ChatbotPageState extends State<ChatbotPage>
   @override
   void initState() {
     super.initState();
-    // Welcome message
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_welcomeInitialized) return;
+    _welcomeInitialized = true;
+    final language = AppLanguageScope.of(context).language;
     _messages.add(
-      _ChatMessage(
-        text:
-            'Hi there! 👋 I\'m your Disaster Resilience AI assistant.\n\nAsk me anything about floods, earthquakes, evacuation, emergency kits, or how to use this app!',
-        sender: _Sender.bot,
-      ),
+      _ChatMessage(text: _welcomeText(language), sender: _Sender.bot),
     );
+  }
+
+  String _welcomeText(AppLanguage language) {
+    return switch (language) {
+      AppLanguage.english =>
+        'Hi there! 👋 I\'m your LANDA assistant.\n\nAsk me anything about floods, earthquakes, evacuation, emergency kits, or how to use this app!',
+      AppLanguage.malay =>
+        'Hai! 👋 Saya pembantu LANDA anda.\n\nTanya saya apa-apa tentang banjir, gempa bumi, pemindahan, kit kecemasan, atau cara menggunakan aplikasi ini!',
+      AppLanguage.chinese =>
+        '你好！👋 我是你的 LANDA 助手。\n\n你可以问我任何关于洪水、地震、撤离、应急包，或如何使用本应用的问题！',
+    };
+  }
+
+  List<String> _localizedSuggestions(AppLanguage language) {
+    return switch (language) {
+      AppLanguage.english => ChatbotService.suggestions,
+      AppLanguage.malay => const [
+        'Apa perlu dibuat semasa banjir?',
+        'Bagaimana jika gempa bumi berlaku?',
+        'Apa ada dalam kit kecemasan?',
+        'Bagaimana cari pusat pemindahan?',
+      ],
+      AppLanguage.chinese => const [
+        '洪水时我该怎么做？',
+        '地震发生时怎么办？',
+        '应急包里应该有什么？',
+        '如何找到疏散中心？',
+      ],
+    };
   }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final next = _scrollController.offset > 2;
+    if (next != _isScrolled && mounted) {
+      setState(() => _isScrolled = next);
+    }
   }
 
   Future<void> _send(String text) async {
@@ -89,11 +136,58 @@ class _ChatbotPageState extends State<ChatbotPage>
 
   @override
   Widget build(BuildContext context) {
+    final language = AppLanguageScope.of(context).language;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pageBg = isDark ? const Color(0xFF0F140F) : Colors.white;
+    final barBg = isDark ? const Color(0xFF1B251B) : _botGreen;
+    final botBubble = isDark ? const Color(0xFF223123) : _botBubble;
+    final botText = isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1E293B);
+    final suggestionBg = isDark ? const Color(0xFF223123) : _botBubble;
+    final suggestionBorder = isDark
+        ? const Color(0xFF86C77C).withAlpha(120)
+        : _botGreen.withAlpha(128);
+    final suggestionText = isDark
+        ? const Color(0xFF9EDB94)
+        : const Color(0xFF2E7D32);
+    final inputBarBg = isDark ? const Color(0xFF1B251B) : Colors.white;
+    final inputFieldBg = isDark
+        ? const Color(0xFF243024)
+        : const Color(0xFFF5F5F5);
+    final inputText = isDark
+        ? const Color(0xFFE5E7EB)
+        : const Color(0xFF111827);
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: pageBg,
       appBar: AppBar(
-        backgroundColor: _botGreen,
+        backgroundColor: _isScrolled
+            ? barBg.withAlpha(isDark ? 220 : 240)
+            : barBg,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        scrolledUnderElevation: 0,
         elevation: 0,
+        flexibleSpace: _isScrolled
+            ? ClipRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: barBg.withAlpha(isDark ? 180 : 210),
+                      border: Border(
+                        bottom: BorderSide(
+                          color:
+                              (isDark
+                                      ? const Color(0xFF334236)
+                                      : Colors.white.withAlpha(120))
+                                  .withAlpha(120),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            : null,
         leading: IconButton(
           icon: const Icon(
             Icons.arrow_back_ios_new_rounded,
@@ -103,33 +197,21 @@ class _ChatbotPageState extends State<ChatbotPage>
         ),
         title: Row(
           children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: Colors.white.withAlpha(51),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.smart_toy_rounded,
-                color: Colors.white,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Resilience AI',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                const LandaBrandTitle(
+                  wordmarkSize: 19,
+                  iconColor: Colors.white,
+                  wordmarkColors: [Color(0xFFFFFFFF), Color(0xFFEAF7E7)],
+                  wordmarkStrokeColor: Color(0x66FFFFFF),
                 ),
                 Text(
-                  'Disaster Assistant',
+                  switch (language) {
+                    AppLanguage.english => 'Assistant Chatbot',
+                    AppLanguage.malay => 'Pembantu Chatbot',
+                    AppLanguage.chinese => '智能助手',
+                  },
                   style: TextStyle(
                     color: Colors.white.withAlpha(204),
                     fontSize: 11,
@@ -153,7 +235,7 @@ class _ChatbotPageState extends State<ChatbotPage>
                   return _buildTypingIndicator();
                 }
                 final msg = _messages[index];
-                return _buildBubble(msg);
+                return _buildBubble(msg, botBubble, botText);
               },
             ),
           ),
@@ -162,15 +244,20 @@ class _ChatbotPageState extends State<ChatbotPage>
               _messages.isNotEmpty &&
               _messages.last.sender == _Sender.bot &&
               _messages.length == 1)
-            _buildSuggestions(),
+            _buildSuggestions(
+              suggestionBg,
+              suggestionBorder,
+              suggestionText,
+              language,
+            ),
           // ── Input bar ────────────────────────────────────────────────
-          _buildInputBar(),
+          _buildInputBar(inputBarBg, inputFieldBg, inputText),
         ],
       ),
     );
   }
 
-  Widget _buildBubble(_ChatMessage msg) {
+  Widget _buildBubble(_ChatMessage msg, Color botBubble, Color botText) {
     final isUser = msg.sender == _Sender.user;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -200,7 +287,7 @@ class _ChatbotPageState extends State<ChatbotPage>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: isUser ? _userBubble : _botBubble,
+                color: isUser ? _userBubble : botBubble,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
                   topRight: const Radius.circular(16),
@@ -215,7 +302,7 @@ class _ChatbotPageState extends State<ChatbotPage>
                   ),
                 ],
               ),
-              child: _buildMessageText(msg.text, isUser),
+              child: _buildMessageText(msg.text, isUser, botText),
             ),
           ),
           if (isUser) const SizedBox(width: 4),
@@ -224,11 +311,11 @@ class _ChatbotPageState extends State<ChatbotPage>
     );
   }
 
-  Widget _buildMessageText(String text, bool isUser) {
+  Widget _buildMessageText(String text, bool isUser, Color botText) {
     // Render **bold** markdown inline
     final spans = <TextSpan>[];
     final baseStyle = TextStyle(
-      color: isUser ? Colors.white : const Color(0xFF1E293B),
+      color: isUser ? Colors.white : botText,
       fontSize: 14,
       height: 1.5,
     );
@@ -253,6 +340,8 @@ class _ChatbotPageState extends State<ChatbotPage>
   }
 
   Widget _buildTypingIndicator() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final botBubble = isDark ? const Color(0xFF223123) : _botBubble;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -275,7 +364,7 @@ class _ChatbotPageState extends State<ChatbotPage>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: _botBubble,
+              color: botBubble,
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(16),
                 topRight: Radius.circular(16),
@@ -290,13 +379,18 @@ class _ChatbotPageState extends State<ChatbotPage>
     );
   }
 
-  Widget _buildSuggestions() {
+  Widget _buildSuggestions(
+    Color suggestionBg,
+    Color suggestionBorder,
+    Color suggestionText,
+    AppLanguage language,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
-          children: ChatbotService.suggestions.map((suggestion) {
+          children: _localizedSuggestions(language).map((suggestion) {
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: GestureDetector(
@@ -307,14 +401,14 @@ class _ChatbotPageState extends State<ChatbotPage>
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    border: Border.all(color: _botGreen.withAlpha(128)),
+                    border: Border.all(color: suggestionBorder),
                     borderRadius: BorderRadius.circular(20),
-                    color: _botBubble,
+                    color: suggestionBg,
                   ),
                   child: Text(
                     suggestion,
-                    style: const TextStyle(
-                      color: _botGreen,
+                    style: TextStyle(
+                      color: suggestionText,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
@@ -328,7 +422,8 @@ class _ChatbotPageState extends State<ChatbotPage>
     );
   }
 
-  Widget _buildInputBar() {
+  Widget _buildInputBar(Color inputBarBg, Color inputFieldBg, Color inputText) {
+    final language = AppLanguageScope.of(context).language;
     return Container(
       padding: EdgeInsets.only(
         left: 16,
@@ -337,7 +432,7 @@ class _ChatbotPageState extends State<ChatbotPage>
         bottom: MediaQuery.of(context).viewInsets.bottom + 12,
       ),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: inputBarBg,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(18),
@@ -352,11 +447,16 @@ class _ChatbotPageState extends State<ChatbotPage>
             child: TextField(
               controller: _textController,
               textCapitalization: TextCapitalization.sentences,
+              style: TextStyle(color: inputText),
               decoration: InputDecoration(
-                hintText: 'Ask about disasters...',
+                hintText: switch (language) {
+                  AppLanguage.english => 'Ask about disasters...',
+                  AppLanguage.malay => 'Tanya tentang bencana...',
+                  AppLanguage.chinese => '询问灾害相关问题...',
+                },
                 hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
                 filled: true,
-                fillColor: const Color(0xFFF5F5F5),
+                fillColor: inputFieldBg,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 10,
