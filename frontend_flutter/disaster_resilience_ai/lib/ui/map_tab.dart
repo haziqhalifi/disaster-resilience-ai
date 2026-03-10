@@ -134,8 +134,10 @@ class _MapTabState extends State<MapTab> {
       children: [
         // OpenStreetMap tiles
         TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.disaster.resilience.ai',
+          urlTemplate:
+              'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+          subdomains: const ['a', 'b', 'c', 'd'],
+          userAgentPackageName: 'com.disasterai.disaster_resilience_ai',
         ),
         // Risk zone circles
         if (_mapData != null) _buildZoneCircles(),
@@ -233,7 +235,11 @@ class _MapTabState extends State<MapTab> {
                     ),
                   ],
                 ),
-                child: const Icon(Icons.local_hospital, color: Colors.white, size: 22),
+                child: const Icon(
+                  Icons.local_hospital,
+                  color: Colors.white,
+                  size: 22,
+                ),
               ),
             ),
           ),
@@ -264,7 +270,10 @@ class _MapTabState extends State<MapTab> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: _zoneColor(zone.zoneType), width: 2),
+                  border: Border.all(
+                    color: _zoneColor(zone.zoneType),
+                    width: 2,
+                  ),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withAlpha(51),
@@ -276,7 +285,11 @@ class _MapTabState extends State<MapTab> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(_zoneIcon(zone.zoneType), size: 14, color: _zoneColor(zone.zoneType)),
+                    Icon(
+                      _zoneIcon(zone.zoneType),
+                      size: 14,
+                      color: _zoneColor(zone.zoneType),
+                    ),
                     const SizedBox(width: 4),
                     Flexible(
                       child: Text(
@@ -356,7 +369,10 @@ class _MapTabState extends State<MapTab> {
                 decoration: InputDecoration(
                   hintText: 'Search location...',
                   hintStyle: TextStyle(color: Colors.grey[400]),
-                  prefixIcon: const Icon(Icons.search, color: Color(0xFF2E7D32)),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: Color(0xFF2E7D32),
+                  ),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 14),
                 ),
@@ -496,16 +512,36 @@ class _MapTabState extends State<MapTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildLayerToggle(Icons.dangerous, Colors.red, _showDangerZones,
-                (v) => setState(() => _showDangerZones = v)),
-            _buildLayerToggle(Icons.warning_amber, Colors.orange, _showWarningZones,
-                (v) => setState(() => _showWarningZones = v)),
-            _buildLayerToggle(Icons.check_circle, const Color(0xFF2E7D32), _showSafeZones,
-                (v) => setState(() => _showSafeZones = v)),
-            _buildLayerToggle(Icons.route, Colors.blue, _showEvacRoutes,
-                (v) => setState(() => _showEvacRoutes = v)),
-            _buildLayerToggle(Icons.local_hospital, Colors.teal, _showEvacCentres,
-                (v) => setState(() => _showEvacCentres = v)),
+            _buildLayerToggle(
+              Icons.dangerous,
+              Colors.red,
+              _showDangerZones,
+              (v) => setState(() => _showDangerZones = v),
+            ),
+            _buildLayerToggle(
+              Icons.warning_amber,
+              Colors.orange,
+              _showWarningZones,
+              (v) => setState(() => _showWarningZones = v),
+            ),
+            _buildLayerToggle(
+              Icons.check_circle,
+              const Color(0xFF2E7D32),
+              _showSafeZones,
+              (v) => setState(() => _showSafeZones = v),
+            ),
+            _buildLayerToggle(
+              Icons.route,
+              Colors.blue,
+              _showEvacRoutes,
+              (v) => setState(() => _showEvacRoutes = v),
+            ),
+            _buildLayerToggle(
+              Icons.local_hospital,
+              Colors.teal,
+              _showEvacCentres,
+              (v) => setState(() => _showEvacCentres = v),
+            ),
           ],
         ),
       ),
@@ -527,11 +563,7 @@ class _MapTabState extends State<MapTab> {
           color: value ? color.withAlpha(26) : Colors.grey[100],
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Icon(
-          icon,
-          color: value ? color : Colors.grey[400],
-          size: 22,
-        ),
+        child: Icon(icon, color: value ? color : Colors.grey[400], size: 22),
       ),
     );
   }
@@ -654,7 +686,11 @@ class _MapTabState extends State<MapTab> {
                       ),
                       Text(
                         '${zone.zoneType.toUpperCase()} • ${zone.hazardType.toUpperCase()}',
-                        style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 12),
+                        style: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
@@ -665,10 +701,17 @@ class _MapTabState extends State<MapTab> {
             // Risk Score Bar
             Row(
               children: [
-                const Text('Risk Score: ', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const Text(
+                  'Risk Score: ',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
                 Text(
                   '${(zone.riskScore * 100).toInt()}%',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                    fontSize: 14,
+                  ),
                 ),
               ],
             ),
@@ -685,7 +728,11 @@ class _MapTabState extends State<MapTab> {
             const SizedBox(height: 14),
             Text(
               zone.description,
-              style: TextStyle(color: Colors.grey[700], fontSize: 13, height: 1.5),
+              style: TextStyle(
+                color: Colors.grey[700],
+                fontSize: 13,
+                height: 1.5,
+              ),
             ),
             const SizedBox(height: 12),
             Row(
@@ -744,7 +791,11 @@ class _MapTabState extends State<MapTab> {
                     color: const Color(0xFFE8F5E9),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.local_hospital, color: Color(0xFF2E7D32), size: 24),
+                  child: const Icon(
+                    Icons.local_hospital,
+                    color: Color(0xFF2E7D32),
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -777,10 +828,16 @@ class _MapTabState extends State<MapTab> {
             // Occupancy bar
             Row(
               children: [
-                const Text('Occupancy: ', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                const Text(
+                  'Occupancy: ',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
                 Text(
                   '${centre.currentOccupancy} / ${centre.capacity}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
                 ),
                 Text(
                   ' (${centre.occupancyPercent.toStringAsFixed(0)}%)',
@@ -799,8 +856,8 @@ class _MapTabState extends State<MapTab> {
                   centre.occupancyPercent > 80
                       ? Colors.red
                       : centre.occupancyPercent > 50
-                          ? Colors.orange
-                          : const Color(0xFF2E7D32),
+                      ? Colors.orange
+                      : const Color(0xFF2E7D32),
                 ),
               ),
             ),

@@ -1,5 +1,5 @@
 /// Data models for the Hyper-Local Early Warning system.
-library warning_model;
+library;
 
 class GeoPoint {
   final double latitude;
@@ -15,9 +15,9 @@ class GeoPoint {
   }
 
   Map<String, dynamic> toJson() => {
-        'latitude': latitude,
-        'longitude': longitude,
-      };
+    'latitude': latitude,
+    'longitude': longitude,
+  };
 }
 
 /// Hazard types matching the backend enum.
@@ -133,9 +133,6 @@ class WarningList {
     final list = (json['warnings'] as List<dynamic>)
         .map((e) => Warning.fromJson(e as Map<String, dynamic>))
         .toList();
-    return WarningList(
-      count: json['count'] as int,
-      warnings: list,
-    );
+    return WarningList(count: json['count'] as int, warnings: list);
   }
 }

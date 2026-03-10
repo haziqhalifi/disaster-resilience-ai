@@ -37,15 +37,8 @@ class _SubmitReportPageState extends State<SubmitReportPage> {
           children: [
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: bgColor,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                color: iconColor,
-                size: 32,
-              ),
+              decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
+              child: Icon(icon, color: iconColor, size: 32),
             ),
             const SizedBox(height: 16),
             Text(
@@ -66,9 +59,11 @@ class _SubmitReportPageState extends State<SubmitReportPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA), // Off-white background
+      backgroundColor: const Color(0xFFF0F2F5),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF8F9FA),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 1,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
@@ -83,6 +78,13 @@ class _SubmitReportPageState extends State<SubmitReportPage> {
           ),
         ),
         centerTitle: true,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(
+            height: 1,
+            color: const Color(0xFF2D5927).withAlpha(26),
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline, color: Color(0xFF2E7D32)),
@@ -106,11 +108,7 @@ class _SubmitReportPageState extends State<SubmitReportPage> {
             const SizedBox(height: 8),
             const Text(
               'Select the incident type to notify the\ncommunity.',
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 14,
-                height: 1.5,
-              ),
+              style: TextStyle(color: Colors.grey, fontSize: 14, height: 1.5),
             ),
             const SizedBox(height: 24),
             GridView.count(
@@ -168,7 +166,10 @@ class _SubmitReportPageState extends State<SubmitReportPage> {
                       color: Colors.red[600],
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.share_location, color: Colors.white),
+                    child: const Icon(
+                      Icons.share_location,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   const Expanded(
@@ -186,10 +187,7 @@ class _SubmitReportPageState extends State<SubmitReportPage> {
                         SizedBox(height: 4),
                         Text(
                           'Priority rescue alert',
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 12,
-                          ),
+                          style: TextStyle(color: Colors.grey, fontSize: 12),
                         ),
                       ],
                     ),
@@ -197,7 +195,7 @@ class _SubmitReportPageState extends State<SubmitReportPage> {
                   Switch(
                     value: _vulnerableHelp,
                     onChanged: (val) => setState(() => _vulnerableHelp = val),
-                    activeColor: Colors.white,
+                    activeThumbColor: Colors.white,
                     activeTrackColor: Colors.red[400],
                     inactiveThumbColor: Colors.white,
                     inactiveTrackColor: Colors.grey[300],
@@ -225,7 +223,10 @@ class _SubmitReportPageState extends State<SubmitReportPage> {
               ),
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
@@ -240,7 +241,11 @@ class _SubmitReportPageState extends State<SubmitReportPage> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.location_on_outlined, color: Colors.green[700], size: 16),
+                      Icon(
+                        Icons.location_on_outlined,
+                        color: Colors.green[700],
+                        size: 16,
+                      ),
                       const SizedBox(width: 8),
                       const Text(
                         'Kampung Melayu, Jakarta',
@@ -271,10 +276,7 @@ class _SubmitReportPageState extends State<SubmitReportPage> {
                 ),
                 icon: const Text(
                   'Send Incident Report',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 label: const Icon(Icons.send_outlined),
               ),

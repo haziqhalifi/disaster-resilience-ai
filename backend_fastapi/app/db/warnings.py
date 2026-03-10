@@ -116,3 +116,14 @@ def get_all_active_warnings() -> list[WarningRecord]:
         .execute()
     )
     return res.data
+
+
+def get_warnings_since(since: str, active_only: bool = True) -> list[WarningRecord]:
+    """Return warnings created after *since* (ISO-8601 timestamp)."""
+    sb = get_client()
+    query = sb.table("warnings").select("*").gt("created_at", since)
+    if active_only:
+        query = query.eq("active", True)
+    query = query.order("created_at", desc=True)
+    res = query.execute()
+    return res.data

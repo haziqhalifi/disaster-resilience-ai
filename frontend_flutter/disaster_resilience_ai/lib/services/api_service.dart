@@ -1,5 +1,7 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:async';
+import 'package:flutter/foundation.dart'
+  show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:http/http.dart' as http;
 
 class AuthResult {
@@ -28,15 +30,29 @@ class AuthResult {
 
 /// Service class for communicating with the FastAPI backend.
 class ApiService {
+  static const Duration _requestTimeout = Duration(seconds: 12);
+  static const String _baseUrlOverride = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: '',
+  );
+
   /// Base URL of the FastAPI server.
+  ///
+  /// Override with `--dart-define=API_BASE_URL=http://<host>:8000`.
   /// - Web (Chrome/Edge): uses localhost directly.
   /// - Android emulator: 10.0.2.2 maps to the host machine's localhost.
-  /// - Physical device: replace with your machine's LAN IP.
+  /// - Desktop/iOS: localhost works when backend runs on same machine.
   static String get baseUrl {
+    if (_baseUrlOverride.trim().isNotEmpty) {
+      return _baseUrlOverride.trim();
+    }
     if (kIsWeb) {
       return 'http://localhost:8000';
     }
-    return 'http://10.0.2.2:8000';
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8000';
+    }
+    return 'http://localhost:8000';
   }
 
   final http.Client _client;
@@ -72,14 +88,13 @@ class ApiService {
     required String email,
     required String password,
   }) async {
-    final response = await _client.post(
+    final response = await _postWithNetworkHandling(
       Uri.parse('$baseUrl/api/v1/auth/signup'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
+      body: {
         'username': username,
         'email': email,
         'password': password,
-      }),
+      },
     );
 
     if (response.statusCode == 201) {
@@ -95,10 +110,9 @@ class ApiService {
     required String email,
     required String password,
   }) async {
-    final response = await _client.post(
+    final response = await _postWithNetworkHandling(
       Uri.parse('$baseUrl/api/v1/auth/signin'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email, 'password': password}),
+      body: {'email': email, 'password': password},
     );
 
     if (response.statusCode == 200) {
@@ -111,7 +125,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> me(String accessToken) async {
-    final response = await _client.get(
+    final response = await _getWithNetworkHandling(
       Uri.parse('$baseUrl/api/v1/auth/me'),
       headers: {'Authorization': 'Bearer $accessToken'},
     );
@@ -134,6 +148,49 @@ class ApiService {
       // Fallback below if response body is not JSON.
     }
     return 'Request failed with status ${response.statusCode}';
+  }
+
+  Future<http.Response> _postWithNetworkHandling(
+    Uri uri, {
+    required Map<String, dynamic> body,
+    Map<String, String>? headers,
+  }) async {
+    try {
+      return await _client
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              ...?headers,
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(_requestTimeout);
+    } on TimeoutException {
+      throw Exception(_connectivityErrorMessage());
+    } on http.ClientException {
+      throw Exception(_connectivityErrorMessage());
+    }
+  }
+
+  Future<http.Response> _getWithNetworkHandling(
+    Uri uri, {
+    Map<String, String>? headers,
+  }) async {
+    try {
+      return await _client
+          .get(uri, headers: headers)
+          .timeout(_requestTimeout);
+    } on TimeoutException {
+      throw Exception(_connectivityErrorMessage());
+    } on http.ClientException {
+      throw Exception(_connectivityErrorMessage());
+    }
+  }
+
+  String _connectivityErrorMessage() {
+    return 'Cannot reach backend at $baseUrl. Ensure FastAPI is running and '
+        'use --dart-define=API_BASE_URL=http://<your-host>:8000 if needed.';
   }
 
   // ── Hyper-Local Early Warnings ──────────────────────────────────────────
@@ -164,15 +221,13 @@ class ApiService {
     String? hazardType,
     String? alertLevel,
   }) async {
-    final params = <String, String>{
-      'active_only': activeOnly.toString(),
-    };
+    final params = <String, String>{'active_only': activeOnly.toString()};
     if (hazardType != null) params['hazard_type'] = hazardType;
     if (alertLevel != null) params['alert_level'] = alertLevel;
 
-    final uri = Uri.parse('$baseUrl/api/v1/warnings').replace(
-      queryParameters: params,
-    );
+    final uri = Uri.parse(
+      '$baseUrl/api/v1/warnings',
+    ).replace(queryParameters: params);
     final response = await _client.get(uri);
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -204,10 +259,7 @@ class ApiService {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $accessToken',
       },
-      body: jsonEncode({
-        'latitude': latitude,
-        'longitude': longitude,
-      }),
+      body: jsonEncode({'latitude': latitude, 'longitude': longitude}),
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -221,16 +273,21 @@ class ApiService {
     String? fcmToken,
     String? phoneNumber,
   }) async {
+    final payload = <String, dynamic>{};
+    if (fcmToken != null && fcmToken.isNotEmpty) {
+      payload['fcm_token'] = fcmToken;
+    }
+    if (phoneNumber != null && phoneNumber.isNotEmpty) {
+      payload['phone_number'] = phoneNumber;
+    }
+
     final response = await _client.put(
       Uri.parse('$baseUrl/api/v1/devices/me/device'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $accessToken',
       },
-      body: jsonEncode({
-        if (fcmToken != null) 'fcm_token': fcmToken,
-        if (phoneNumber != null) 'phone_number': phoneNumber,
-      }),
+      body: jsonEncode(payload),
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -245,9 +302,9 @@ class ApiService {
     final params = <String, String>{};
     if (hazardType != null) params['hazard_type'] = hazardType;
 
-    final uri = Uri.parse('$baseUrl/api/v1/risk-map').replace(
-      queryParameters: params.isNotEmpty ? params : null,
-    );
+    final uri = Uri.parse(
+      '$baseUrl/api/v1/risk-map',
+    ).replace(queryParameters: params.isNotEmpty ? params : null);
     final response = await _client.get(uri);
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -264,7 +321,8 @@ class ApiService {
     required double endLon,
   }) async {
     // Public OSRM API (no key required for low volume)
-    final url = 'https://router.project-osrm.org/route/v1/driving/'
+    final url =
+        'https://router.project-osrm.org/route/v1/driving/'
         '$startLon,$startLat;$endLon,$endLat?overview=full&geometries=geojson';
 
     try {
@@ -319,5 +377,78 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
     throw Exception(_extractErrorMessage(response));
+  }
+
+  // ── Family Location Sharing ─────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> inviteFamilyMember({
+    required String accessToken,
+    required String identifier,
+  }) async {
+    final response = await _postWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/family/invite'),
+      headers: {'Authorization': 'Bearer $accessToken'},
+      body: {'identifier': identifier},
+    );
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
+  Future<Map<String, dynamic>> fetchFamilyInvites({
+    required String accessToken,
+  }) async {
+    final response = await _getWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/family/invites'),
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
+  Future<Map<String, dynamic>> respondFamilyInvite({
+    required String accessToken,
+    required String inviteId,
+    required bool accept,
+  }) async {
+    final response = await _postWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/family/invites/$inviteId/respond'),
+      headers: {'Authorization': 'Bearer $accessToken'},
+      body: {'accept': accept},
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
+  Future<Map<String, dynamic>> fetchFamilyLocations({
+    required String accessToken,
+  }) async {
+    final response = await _getWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/family/members/locations'),
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
+  /// Generic GET that returns decoded JSON or null on failure.
+  /// Used by [NotificationService] for polling.
+  Future<Map<String, dynamic>?> httpGet(Uri uri) async {
+    try {
+      final response = await _client.get(uri);
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+    } catch (_) {
+      // Swallow — caller decides how to handle null.
+    }
+    return null;
   }
 }

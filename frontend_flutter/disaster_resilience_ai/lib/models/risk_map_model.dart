@@ -1,5 +1,5 @@
 /// Data models for the AI Risk Mapping system.
-library risk_map_model;
+library;
 
 /// A risk zone (danger, warning, or safe area).
 class RiskZone {

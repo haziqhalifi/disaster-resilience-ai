@@ -21,8 +21,7 @@ class EvacuationNavigationPage extends StatefulWidget {
       _EvacuationNavigationPageState();
 }
 
-class _EvacuationNavigationPageState
-    extends State<EvacuationNavigationPage> {
+class _EvacuationNavigationPageState extends State<EvacuationNavigationPage> {
   final MapController _mapController = MapController();
 
   /// Haversine distance in km between user and destination
@@ -32,7 +31,8 @@ class _EvacuationNavigationPageState
     final lon1 = widget.userLocation.longitude;
     final lat2 = widget.destination.latitude;
     final lon2 = widget.destination.longitude;
-    final a = 0.5 -
+    final a =
+        0.5 -
         cos((lat2 - lat1) * p) / 2 +
         cos(lat1 * p) * cos(lat2 * p) * (1 - cos((lon2 - lon1) * p)) / 2;
     return 12742 * asin(sqrt(a));
@@ -49,15 +49,17 @@ class _EvacuationNavigationPageState
 
   /// Midpoint between user and destination (for no-route case)
   LatLng get _midPoint => LatLng(
-        (widget.userLocation.latitude + widget.destination.latitude) / 2,
-        (widget.userLocation.longitude + widget.destination.longitude) / 2,
-      );
+    (widget.userLocation.latitude + widget.destination.latitude) / 2,
+    (widget.userLocation.longitude + widget.destination.longitude) / 2,
+  );
 
   @override
   Widget build(BuildContext context) {
     final hasRoute = widget.routePoints.isNotEmpty;
-    final destLatLng =
-        LatLng(widget.destination.latitude, widget.destination.longitude);
+    final destLatLng = LatLng(
+      widget.destination.latitude,
+      widget.destination.longitude,
+    );
 
     return Scaffold(
       body: Stack(
@@ -71,8 +73,10 @@ class _EvacuationNavigationPageState
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.disaster.resilience.ai',
+                urlTemplate:
+                    'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+                subdomains: const ['a', 'b', 'c', 'd'],
+                userAgentPackageName: 'com.disasterai.disaster_resilience_ai',
               ),
 
               // Blue polyline when road route is available
@@ -106,8 +110,11 @@ class _EvacuationNavigationPageState
                     point: widget.userLocation,
                     width: 40,
                     height: 40,
-                    child:
-                        const Icon(Icons.navigation, color: Colors.blue, size: 30),
+                    child: const Icon(
+                      Icons.navigation,
+                      color: Colors.blue,
+                      size: 30,
+                    ),
                   ),
                   // Destination (PPS)
                   Marker(
@@ -117,22 +124,29 @@ class _EvacuationNavigationPageState
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.local_hospital,
-                            color: Colors.green, size: 32),
+                        const Icon(
+                          Icons.local_hospital,
+                          color: Colors.green,
+                          size: 32,
+                        ),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 2),
+                            horizontal: 4,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(4),
                             boxShadow: const [
-                              BoxShadow(color: Colors.black26, blurRadius: 2)
+                              BoxShadow(color: Colors.black26, blurRadius: 2),
                             ],
                           ),
                           child: Text(
                             widget.destination.name,
                             style: const TextStyle(
-                                fontSize: 8, fontWeight: FontWeight.bold),
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -154,7 +168,7 @@ class _EvacuationNavigationPageState
                 color: const Color(0xFF1B5E20),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: const [
-                  BoxShadow(color: Colors.black26, blurRadius: 10)
+                  BoxShadow(color: Colors.black26, blurRadius: 10),
                 ],
               ),
               child: Column(
@@ -162,8 +176,11 @@ class _EvacuationNavigationPageState
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.arrow_upward,
-                          color: Colors.white, size: 36),
+                      const Icon(
+                        Icons.arrow_upward,
+                        color: Colors.white,
+                        size: 36,
+                      ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
@@ -172,20 +189,25 @@ class _EvacuationNavigationPageState
                             const Text(
                               'Head to evacuation centre',
                               style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.bold),
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             Text(
                               widget.destination.name,
                               style: const TextStyle(
-                                  color: Colors.white70, fontSize: 13),
+                                color: Colors.white70,
+                                fontSize: 13,
+                              ),
                             ),
                             if (widget.destination.address.isNotEmpty)
                               Text(
                                 widget.destination.address,
                                 style: const TextStyle(
-                                    color: Colors.white54, fontSize: 11),
+                                  color: Colors.white54,
+                                  fontSize: 11,
+                                ),
                               ),
                           ],
                         ),
@@ -196,21 +218,28 @@ class _EvacuationNavigationPageState
                     const SizedBox(height: 10),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.orange.withAlpha(80),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Row(
                         children: [
-                          Icon(Icons.warning_amber,
-                              color: Colors.orangeAccent, size: 14),
+                          Icon(
+                            Icons.warning_amber,
+                            color: Colors.orangeAccent,
+                            size: 14,
+                          ),
                           SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               'No road route available — straight-line direction shown. Follow road signs towards the PPS.',
-                              style:
-                                  TextStyle(color: Colors.white, fontSize: 10),
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                              ),
                             ),
                           ),
                         ],
@@ -231,11 +260,8 @@ class _EvacuationNavigationPageState
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
               decoration: const BoxDecoration(
                 color: Colors.white,
-                borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(30)),
-                boxShadow: [
-                  BoxShadow(color: Colors.black12, blurRadius: 20)
-                ],
+                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 20)],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -246,9 +272,10 @@ class _EvacuationNavigationPageState
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Estimated Time',
-                              style:
-                                  TextStyle(color: Colors.grey, fontSize: 12)),
+                          const Text(
+                            'Estimated Time',
+                            style: TextStyle(color: Colors.grey, fontSize: 12),
+                          ),
                           Text(
                             _estimatedTime,
                             style: const TextStyle(
@@ -262,13 +289,16 @@ class _EvacuationNavigationPageState
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          const Text('Distance',
-                              style:
-                                  TextStyle(color: Colors.grey, fontSize: 12)),
+                          const Text(
+                            'Distance',
+                            style: TextStyle(color: Colors.grey, fontSize: 12),
+                          ),
                           Text(
                             '${_distanceKm.toStringAsFixed(1)} km',
                             style: const TextStyle(
-                                fontSize: 24, fontWeight: FontWeight.bold),
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
@@ -282,15 +312,17 @@ class _EvacuationNavigationPageState
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red[700],
                         foregroundColor: Colors.white,
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: const Text(
                         'EXIT NAVIGATION',
                         style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ),
