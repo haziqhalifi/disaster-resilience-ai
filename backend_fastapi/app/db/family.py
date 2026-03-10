@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from typing import Any, TypedDict, cast
+from uuid import uuid4
 
 from app.db.supabase_client import get_client
+from app.db import users as user_db
 
 
 def create_family_group(*, leader_user_id: str, name: str = "My Family") -> dict:
@@ -108,16 +111,6 @@ def find_member_by_phone(phone_number: str) -> dict | None:
     sb = get_client()
     res = sb.table("family_members").select("*").eq("phone_number", phone_number).limit(1).execute()
     return res.data[0] if res.data else None
-"""Family relationship store backed by Supabase table ``family_links``."""
-
-from __future__ import annotations
-
-from datetime import datetime, timezone
-from typing import Any, TypedDict, cast
-from uuid import uuid4
-
-from app.db.supabase_client import get_client
-from app.db import users as user_db
 
 
 class FamilyInviteRecord(TypedDict):

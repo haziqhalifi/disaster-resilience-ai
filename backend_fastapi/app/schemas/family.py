@@ -1,5 +1,4 @@
 """Pydantic schemas for family groups and safety check-in."""
-"""Pydantic schemas for family linking and shared live locations."""
 
 from __future__ import annotations
 

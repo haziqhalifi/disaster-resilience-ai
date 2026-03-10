@@ -1,5 +1,4 @@
 """Family group and safety status endpoints."""
-"""Family linking endpoints for real-time location sharing."""
 
 from __future__ import annotations
 
