@@ -228,8 +228,9 @@ class _HomePageState extends State<HomePage> {
     setState(() => _loadingAiRisk = true);
     try {
       // Today's precipitation from the daily forecast
-      final todayPrecip =
-          w.daily.isNotEmpty ? w.daily.first.precipitation : 0.0;
+      final todayPrecip = w.daily.isNotEmpty
+          ? w.daily.first.precipitation
+          : 0.0;
       // Features: rainfall_mm, elevation_m, slope_deg, soil_saturation,
       //           distance_to_river_km, historical_incidents, population_density
       // We derive rainfall from weather; the rest use sensible ASEAN defaults.
@@ -645,7 +646,9 @@ class _HomePageState extends State<HomePage> {
                 zh: '正在分析洪水风险…',
               ),
               style: TextStyle(
-                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
+                color: isDark
+                    ? const Color(0xFFCBD5E1)
+                    : const Color(0xFF64748B),
               ),
             ),
           ],
@@ -713,8 +716,10 @@ class _HomePageState extends State<HomePage> {
               ),
               const Spacer(),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: riskColor.withAlpha(24),
                   borderRadius: BorderRadius.circular(12),
@@ -770,7 +775,8 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(height: 8),
           // "How is this calculated?" toggle
           GestureDetector(
-            onTap: () => setState(() => _showAiRiskDetails = !_showAiRiskDetails),
+            onTap: () =>
+                setState(() => _showAiRiskDetails = !_showAiRiskDetails),
             child: Row(
               children: [
                 Icon(
@@ -799,7 +805,8 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
           ),
-          if (_showAiRiskDetails) ..._buildAiRiskDetails(risk, riskColor, isDark),
+          if (_showAiRiskDetails)
+            ..._buildAiRiskDetails(risk, riskColor, isDark),
         ],
       ),
     );
@@ -810,10 +817,12 @@ class _HomePageState extends State<HomePage> {
     Color accent,
     bool isDark,
   ) {
-    final subtleText =
-        isDark ? const Color(0xFF94A3B8) : const Color(0xFF6B7280);
-    final labelColor =
-        isDark ? const Color(0xFFCBD5E1) : const Color(0xFF374151);
+    final subtleText = isDark
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF6B7280);
+    final labelColor = isDark
+        ? const Color(0xFFCBD5E1)
+        : const Color(0xFF374151);
     final barBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
 
     // Friendly labels for feature names
@@ -832,7 +841,11 @@ class _HomePageState extends State<HomePage> {
         case 'historical_incidents':
           return _tr(en: 'Past incidents', ms: 'Insiden lampau', zh: '历史事件');
         case 'population_density':
-          return _tr(en: 'Population density', ms: 'Kepadatan penduduk', zh: '人口密度');
+          return _tr(
+            en: 'Population density',
+            ms: 'Kepadatan penduduk',
+            zh: '人口密度',
+          );
         default:
           return key;
       }
@@ -841,31 +854,29 @@ class _HomePageState extends State<HomePage> {
     // Sort importances descending
     final entries = risk.featureImportances.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-    final maxImportance =
-        entries.isNotEmpty ? entries.first.value : 1.0;
+    final maxImportance = entries.isNotEmpty ? entries.first.value : 1.0;
 
     return [
       const SizedBox(height: 10),
       Text(
         _tr(
-          en: 'A Gradient Boosting model analyses 7 risk factors from '
+          en:
+              'A Gradient Boosting model analyses 7 risk factors from '
               'live weather data and regional characteristics to estimate '
               'flood probability in your area.',
-          ms: 'Model Gradient Boosting menganalisis 7 faktor risiko '
+          ms:
+              'Model Gradient Boosting menganalisis 7 faktor risiko '
               'daripada data cuaca langsung dan ciri-ciri kawasan untuk '
               'menganggar kebarangkalian banjir di kawasan anda.',
-          zh: 'Gradient Boosting模型分析来自实时天气数据和区域特征的'
+          zh:
+              'Gradient Boosting模型分析来自实时天气数据和区域特征的'
               '7个风险因素，估算您所在地区的洪水概率。',
         ),
         style: TextStyle(fontSize: 11, color: subtleText, height: 1.5),
       ),
       const SizedBox(height: 12),
       Text(
-        _tr(
-          en: 'Factor importance',
-          ms: 'Kepentingan faktor',
-          zh: '因素重要性',
-        ),
+        _tr(en: 'Factor importance', ms: 'Kepentingan faktor', zh: '因素重要性'),
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
@@ -890,9 +901,7 @@ class _HomePageState extends State<HomePage> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(3),
                   child: LinearProgressIndicator(
-                    value: maxImportance > 0
-                        ? e.value / maxImportance
-                        : 0,
+                    value: maxImportance > 0 ? e.value / maxImportance : 0,
                     minHeight: 6,
                     backgroundColor: barBg,
                     valueColor: AlwaysStoppedAnimation<Color>(
