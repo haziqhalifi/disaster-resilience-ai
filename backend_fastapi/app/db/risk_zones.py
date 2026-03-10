@@ -112,6 +112,11 @@ def get_risk_zone(zone_id: str) -> RiskZoneRecord | None:
     return res.data[0] if res.data else None
 
 
+def get_all_risk_zones() -> list[RiskZoneRecord]:
+    """Return all active risk zones (for AI proximity calculations)."""
+    return list_risk_zones(active_only=True)
+
+
 # ── Evacuation Centres CRUD ──────────────────────────────────────────────────
 
 def create_evacuation_centre(

@@ -57,6 +57,7 @@ class ReportOut(BaseModel):
     vulnerable_person:  bool
     vouch_count:        int
     helpful_count:      int
+    confidence_score:   float | None = None
     distance_km:        float | None = None
     current_user_vouched: bool       = False
     current_user_helpful: bool       = False

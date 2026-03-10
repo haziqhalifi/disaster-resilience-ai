@@ -22,6 +22,7 @@ class ReportRecord(TypedDict):
     vulnerable_person: bool
     vouch_count:      int
     helpful_count:    int
+    confidence_score: float | None
     resolved_by:      str | None
     resolution_reason: str | None
     resolved_at:      str | None
@@ -344,6 +345,44 @@ def get_validated_flood_reports_since(minutes: int = 2) -> list[ReportRecord]:
         .eq("status", "validated")
         .eq("report_type", "flood")
         .gte("updated_at", cutoff)
+        .execute()
+    )
+    return res.data or []
+
+
+# ── AI scoring helpers ──────────────────────────────────────────────────────────────
+
+def count_user_reports(user_id: str) -> int:
+    """Return total number of reports submitted by a user."""
+    sb = get_client()
+    res = sb.table("reports").select("id", count="exact").eq("user_id", user_id).execute()
+    return res.count if res.count is not None else 0
+
+
+def update_confidence_score(report_id: str, score: float) -> None:
+    """Persist the AI-computed credibility score on the report."""
+    sb = get_client()
+    sb.table("reports").update({
+        "confidence_score": round(score, 4),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", report_id).execute()
+
+
+def get_pending_reports_for_ai_review(
+    min_age_minutes: int = 5,
+    max_age_hours: int = 24,
+) -> list[ReportRecord]:
+    """Return pending reports old enough for AI re-scoring."""
+    sb = get_client()
+    now = datetime.now(timezone.utc)
+    min_cutoff = (now - timedelta(minutes=min_age_minutes)).isoformat()
+    max_cutoff = (now - timedelta(hours=max_age_hours)).isoformat()
+    res = (
+        sb.table("reports")
+        .select("*")
+        .eq("status", "pending")
+        .lte("created_at", min_cutoff)
+        .gte("created_at", max_cutoff)
         .execute()
     )
     return res.data or []

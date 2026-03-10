@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -14,6 +15,8 @@ from app.schemas.report import (
     ReportRejectRequest, VouchOut,
 )
 from app.schemas.user import UserOut
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -33,6 +36,7 @@ def _to_out(row: dict, current_user_id: str | None = None) -> ReportOut:
         vulnerable_person=row.get("vulnerable_person", False),
         vouch_count=row.get("vouch_count", 0),
         helpful_count=row.get("helpful_count", 0),
+        confidence_score=row.get("confidence_score"),
         distance_km=row.get("distance_km"),
         current_user_vouched=vouched,
         current_user_helpful=helpful,
@@ -55,7 +59,47 @@ async def submit_report(
         longitude=body.longitude,
         vulnerable_person=body.vulnerable_person,
     )
+
+    # ── AI credibility scoring ────────────────────────────────────────────
+    try:
+        from ai_models.services.inference import score_report
+        ai_result = score_report(
+            vouch_count=0,
+            description_length=len(body.description),
+            has_precise_coords=True,
+            report_age_hours=0.0,
+            reporter_total_reports=report_db.count_user_reports(current_user.id),
+            proximity_to_risk_zone_km=_nearest_risk_zone_distance(
+                body.latitude, body.longitude,
+            ),
+        )
+        report_db.update_confidence_score(
+            row["id"], ai_result["confidence_score"],
+        )
+        row["confidence_score"] = ai_result["confidence_score"]
+        logger.info(
+            "Report %s AI confidence=%.2f credible=%s",
+            row["id"], ai_result["confidence_score"], ai_result["is_credible"],
+        )
+    except Exception as exc:
+        logger.warning("AI scoring failed for report %s: %s", row["id"], exc)
+
     return _to_out(row, current_user.id)
+
+
+def _nearest_risk_zone_distance(lat: float, lon: float) -> float:
+    """Best-effort distance to nearest risk zone. Returns 50 km if unknown."""
+    try:
+        from app.db.risk_zones import get_all_risk_zones
+        from app.core.geo import haversine
+        zones = get_all_risk_zones()
+        if not zones:
+            return 50.0
+        return min(
+            haversine(lat, lon, z["latitude"], z["longitude"]) for z in zones
+        )
+    except Exception:
+        return 50.0
 
 
 @router.get("/nearby/list", response_model=ReportList)

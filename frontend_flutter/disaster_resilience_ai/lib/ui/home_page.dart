@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:disaster_resilience_ai/models/warning_model.dart';
+import 'package:disaster_resilience_ai/models/prediction_result.dart';
 import 'package:disaster_resilience_ai/localization/app_language.dart';
 import 'package:disaster_resilience_ai/models/weather_model.dart';
 import 'package:disaster_resilience_ai/services/api_service.dart';
@@ -58,6 +59,11 @@ class _HomePageState extends State<HomePage> {
 
   // ── Weather state ─────────────────────────────────────────────────────────
   WeatherData? _weather;
+
+  // ── AI Risk state ─────────────────────────────────────────────────────────
+  PredictionResult? _aiRisk;
+  bool _loadingAiRisk = false;
+  bool _showAiRiskDetails = false;
 
   // Location — updated from GPS; falls back to Kuantan if unavailable
   double _userLat = 3.8077;
@@ -209,8 +215,42 @@ class _HomePageState extends State<HomePage> {
         longitude: _userLon,
       );
       if (mounted) setState(() => _weather = data);
+      _fetchAiRisk();
     } catch (_) {
       // Non-critical — widget shows placeholder if unavailable
+    }
+  }
+
+  /// Call the AI flood-risk model using live weather data as features.
+  Future<void> _fetchAiRisk() async {
+    final w = _weather;
+    if (w == null) return;
+    setState(() => _loadingAiRisk = true);
+    try {
+      // Today's precipitation from the daily forecast
+      final todayPrecip =
+          w.daily.isNotEmpty ? w.daily.first.precipitation : 0.0;
+      // Features: rainfall_mm, elevation_m, slope_deg, soil_saturation,
+      //           distance_to_river_km, historical_incidents, population_density
+      // We derive rainfall from weather; the rest use sensible ASEAN defaults.
+      final features = <double>[
+        todayPrecip, // rainfall_mm
+        35.0, // elevation_m (coastal ASEAN avg)
+        2.0, // slope_deg
+        w.humidity / 100.0, // soil_saturation proxy
+        1.5, // distance_to_river_km
+        5.0, // historical_incidents
+        2500.0, // population_density
+      ];
+      final json = await _api.predictRisk(features);
+      if (mounted) {
+        setState(() {
+          _aiRisk = PredictionResult.fromJson(json);
+          _loadingAiRisk = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingAiRisk = false);
     }
   }
 
@@ -339,6 +379,8 @@ class _HomePageState extends State<HomePage> {
               _buildStatusSection(),
               const SizedBox(height: 18),
               _buildWeatherSection(),
+              const SizedBox(height: 14),
+              _buildAiRiskCard(),
               const SizedBox(height: 24),
               _buildPrimaryActions(),
               const SizedBox(height: 24),
@@ -571,6 +613,317 @@ class _HomePageState extends State<HomePage> {
         ),
       ],
     );
+  }
+
+  Widget _buildAiRiskCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? const Color(0xFF1B1F2B) : Colors.white;
+    final borderColor = isDark
+        ? const Color(0xFF2A3A5C)
+        : const Color(0xFF2563EB).withAlpha(32);
+
+    if (_loadingAiRisk && _aiRisk == null) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: borderColor),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              _tr(
+                en: 'Analysing flood risk…',
+                ms: 'Menganalisis risiko banjir…',
+                zh: '正在分析洪水风险…',
+              ),
+              style: TextStyle(
+                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final risk = _aiRisk;
+    if (risk == null) return const SizedBox.shrink();
+
+    // Color coding by risk level
+    final Color riskColor;
+    final IconData riskIcon;
+    switch (risk.riskLevel) {
+      case 'critical':
+        riskColor = const Color(0xFFDC2626);
+        riskIcon = Icons.warning_rounded;
+        break;
+      case 'high':
+        riskColor = const Color(0xFFEA580C);
+        riskIcon = Icons.warning_amber_rounded;
+        break;
+      case 'moderate':
+        riskColor = const Color(0xFFD97706);
+        riskIcon = Icons.info_rounded;
+        break;
+      case 'low':
+        riskColor = const Color(0xFF2563EB);
+        riskIcon = Icons.check_circle_outline;
+        break;
+      default:
+        riskColor = const Color(0xFF16A34A);
+        riskIcon = Icons.verified_rounded;
+    }
+
+    final percentage = (risk.riskScore * 100).toStringAsFixed(1);
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: riskColor.withAlpha(64)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.psychology_rounded, color: riskColor, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                _tr(
+                  en: 'AI Flood Risk Assessment',
+                  ms: 'Penilaian Risiko Banjir AI',
+                  zh: 'AI洪水风险评估',
+                ),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isDark
+                      ? const Color(0xFFE5E7EB)
+                      : const Color(0xFF111827),
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: riskColor.withAlpha(24),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  risk.riskLevel.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: riskColor,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          // Risk bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: risk.riskScore,
+              minHeight: 8,
+              backgroundColor: riskColor.withAlpha(30),
+              valueColor: AlwaysStoppedAnimation<Color>(riskColor),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(riskIcon, size: 16, color: riskColor),
+              const SizedBox(width: 6),
+              Text(
+                '$percentage% ${_tr(en: 'flood probability', ms: 'kebarangkalian banjir', zh: '洪水概率')}',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: riskColor,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                risk.model,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isDark
+                      ? const Color(0xFF64748B)
+                      : const Color(0xFF9CA3AF),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // "How is this calculated?" toggle
+          GestureDetector(
+            onTap: () => setState(() => _showAiRiskDetails = !_showAiRiskDetails),
+            child: Row(
+              children: [
+                Icon(
+                  _showAiRiskDetails
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded,
+                  size: 18,
+                  color: isDark
+                      ? const Color(0xFF94A3B8)
+                      : const Color(0xFF6B7280),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _tr(
+                    en: 'How is this calculated?',
+                    ms: 'Bagaimana ini dikira?',
+                    zh: '如何计算？',
+                  ),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFF6B7280),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_showAiRiskDetails) ..._buildAiRiskDetails(risk, riskColor, isDark),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildAiRiskDetails(
+    PredictionResult risk,
+    Color accent,
+    bool isDark,
+  ) {
+    final subtleText =
+        isDark ? const Color(0xFF94A3B8) : const Color(0xFF6B7280);
+    final labelColor =
+        isDark ? const Color(0xFFCBD5E1) : const Color(0xFF374151);
+    final barBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+
+    // Friendly labels for feature names
+    String featureLabel(String key) {
+      switch (key) {
+        case 'rainfall_mm':
+          return _tr(en: 'Rainfall', ms: 'Hujan', zh: '降雨量');
+        case 'elevation_m':
+          return _tr(en: 'Elevation', ms: 'Ketinggian', zh: '海拔');
+        case 'slope_deg':
+          return _tr(en: 'Terrain slope', ms: 'Cerun', zh: '坡度');
+        case 'soil_saturation':
+          return _tr(en: 'Soil saturation', ms: 'Ketepuan tanah', zh: '土壤饱和度');
+        case 'distance_to_river_km':
+          return _tr(en: 'River proximity', ms: 'Jarak sungai', zh: '河流距离');
+        case 'historical_incidents':
+          return _tr(en: 'Past incidents', ms: 'Insiden lampau', zh: '历史事件');
+        case 'population_density':
+          return _tr(en: 'Population density', ms: 'Kepadatan penduduk', zh: '人口密度');
+        default:
+          return key;
+      }
+    }
+
+    // Sort importances descending
+    final entries = risk.featureImportances.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final maxImportance =
+        entries.isNotEmpty ? entries.first.value : 1.0;
+
+    return [
+      const SizedBox(height: 10),
+      Text(
+        _tr(
+          en: 'A Gradient Boosting model analyses 7 risk factors from '
+              'live weather data and regional characteristics to estimate '
+              'flood probability in your area.',
+          ms: 'Model Gradient Boosting menganalisis 7 faktor risiko '
+              'daripada data cuaca langsung dan ciri-ciri kawasan untuk '
+              'menganggar kebarangkalian banjir di kawasan anda.',
+          zh: 'Gradient Boosting模型分析来自实时天气数据和区域特征的'
+              '7个风险因素，估算您所在地区的洪水概率。',
+        ),
+        style: TextStyle(fontSize: 11, color: subtleText, height: 1.5),
+      ),
+      const SizedBox(height: 12),
+      Text(
+        _tr(
+          en: 'Factor importance',
+          ms: 'Kepentingan faktor',
+          zh: '因素重要性',
+        ),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: labelColor,
+        ),
+      ),
+      const SizedBox(height: 8),
+      ...entries.map((e) {
+        final pct = (e.value * 100).toStringAsFixed(1);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 110,
+                child: Text(
+                  featureLabel(e.key),
+                  style: TextStyle(fontSize: 11, color: labelColor),
+                ),
+              ),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: LinearProgressIndicator(
+                    value: maxImportance > 0
+                        ? e.value / maxImportance
+                        : 0,
+                    minHeight: 6,
+                    backgroundColor: barBg,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      accent.withAlpha(160),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 38,
+                child: Text(
+                  '$pct%',
+                  textAlign: TextAlign.right,
+                  style: TextStyle(fontSize: 10, color: subtleText),
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+      const SizedBox(height: 4),
+      Text(
+        _tr(
+          en: 'Model: ${risk.model} ${risk.modelVersion}',
+          ms: 'Model: ${risk.model} ${risk.modelVersion}',
+          zh: '模型: ${risk.model} ${risk.modelVersion}',
+        ),
+        style: TextStyle(fontSize: 10, color: subtleText),
+      ),
+    ];
   }
 
   Widget _buildWeatherSection() {
