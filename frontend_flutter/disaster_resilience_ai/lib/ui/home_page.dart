@@ -16,6 +16,9 @@ import 'package:disaster_resilience_ai/ui/map_tab.dart';
 import 'package:disaster_resilience_ai/ui/profile_tab.dart';
 import 'package:disaster_resilience_ai/ui/weather_page.dart';
 import 'package:disaster_resilience_ai/ui/chatbot_page.dart';
+import 'package:disaster_resilience_ai/ui/disaster_checklist_page.dart';
+import 'package:disaster_resilience_ai/ui/learn_page.dart';
+import 'package:disaster_resilience_ai/ui/safe_routes_page.dart';
 import 'package:disaster_resilience_ai/models/disaster_news_model.dart';
 import 'package:disaster_resilience_ai/ui/all_warnings_page.dart';
 import 'package:disaster_resilience_ai/ui/all_news_page.dart';
@@ -754,26 +757,29 @@ class _HomePageState extends State<HomePage> {
           ),
           children: [
             _buildPrimaryActionChip(
-              icon: Icons.map,
-              label: _tr(en: 'Maps', ms: 'Peta', zh: '地图'),
-              onPressed: () => setState(() => _selectedIndex = 2),
-            ),
-            _buildPrimaryActionChip(
-              icon: Icons.assignment,
-              label: _tr(en: 'Plan', ms: 'Pelan', zh: '计划'),
+              icon: Icons.checklist,
+              label: _tr(en: 'Checklist', ms: 'Senarai', zh: '清单'),
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const SchoolPreparednessPage(),
+                  builder: (_) => const DisasterChecklistPage(),
                 ),
               ),
             ),
             _buildPrimaryActionChip(
-              icon: Icons.school,
+              icon: Icons.alt_route,
+              label: _tr(en: 'Safe Routes', ms: 'Laluan', zh: '安全路线'),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SafeRoutesPage()),
+              ),
+            ),
+            _buildPrimaryActionChip(
+              icon: Icons.menu_book,
               label: _tr(en: 'Learn', ms: 'Belajar', zh: '学习'),
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const ChatbotPage()),
+                MaterialPageRoute(builder: (_) => const LearnPage()),
               ),
             ),
             _buildPrimaryActionChip(
