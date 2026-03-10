@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart'
-  show TargetPlatform, defaultTargetPlatform, kIsWeb;
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:http/http.dart' as http;
 
 class AuthResult {
@@ -90,11 +90,7 @@ class ApiService {
   }) async {
     final response = await _postWithNetworkHandling(
       Uri.parse('$baseUrl/api/v1/auth/signup'),
-      body: {
-        'username': username,
-        'email': email,
-        'password': password,
-      },
+      body: {'username': username, 'email': email, 'password': password},
     );
 
     if (response.statusCode == 201) {
@@ -159,10 +155,7 @@ class ApiService {
       return await _client
           .post(
             uri,
-            headers: {
-              'Content-Type': 'application/json',
-              ...?headers,
-            },
+            headers: {'Content-Type': 'application/json', ...?headers},
             body: jsonEncode(body),
           )
           .timeout(_requestTimeout);
@@ -178,9 +171,7 @@ class ApiService {
     Map<String, String>? headers,
   }) async {
     try {
-      return await _client
-          .get(uri, headers: headers)
-          .timeout(_requestTimeout);
+      return await _client.get(uri, headers: headers).timeout(_requestTimeout);
     } on TimeoutException {
       throw Exception(_connectivityErrorMessage());
     } on http.ClientException {
@@ -450,5 +441,93 @@ class ApiService {
       // Swallow — caller decides how to handle null.
     }
     return null;
+  }
+
+  // ── IoT Siren endpoints ────────────────────────────────────────────────
+
+  Future<List<dynamic>> fetchSirens() async {
+    final response = await _client.get(Uri.parse('$baseUrl/api/v1/sirens/'));
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as List<dynamic>;
+    }
+    throw Exception('Failed to fetch sirens (${response.statusCode})');
+  }
+
+  Future<Map<String, dynamic>> registerSiren({
+    required String accessToken,
+    required String name,
+    required double latitude,
+    required double longitude,
+    double radiusKm = 5.0,
+    String? endpointUrl,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/api/v1/sirens/'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode({
+        'name': name,
+        'latitude': latitude,
+        'longitude': longitude,
+        'radius_km': radiusKm,
+        if (endpointUrl != null) 'endpoint_url': endpointUrl,
+      }),
+    );
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to register siren (${response.statusCode})');
+  }
+
+  Future<Map<String, dynamic>> triggerSiren({
+    required String accessToken,
+    required String sirenId,
+    String? warningId,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/api/v1/sirens/$sirenId/trigger'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode({if (warningId != null) 'warning_id': warningId}),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to trigger siren (${response.statusCode})');
+  }
+
+  Future<void> stopSiren({
+    required String accessToken,
+    required String sirenId,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$baseUrl/api/v1/sirens/$sirenId/stop'),
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to stop siren (${response.statusCode})');
+    }
+  }
+
+  Future<void> updateSirenStatus({
+    required String accessToken,
+    required String sirenId,
+    required String status,
+  }) async {
+    final response = await _client.patch(
+      Uri.parse('$baseUrl/api/v1/sirens/$sirenId/status'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: jsonEncode({'status': status}),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to update siren status (${response.statusCode})');
+    }
   }
 }

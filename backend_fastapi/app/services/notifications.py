@@ -34,6 +34,7 @@ class BroadcastResult:
     warning_id: str
     push_sent: int = 0
     sms_sent: int = 0
+    sirens_triggered: int = 0
     total_affected: int = 0
     affected_users: list[str] = field(default_factory=list)
 
@@ -78,6 +79,34 @@ def broadcast_warning(warning: WarningRecord) -> BroadcastResult:
                 result.sms_sent += 1
         else:
             logger.warning("User %s in zone but has no push/SMS channel.", device["user_id"])
+
+    # Trigger IoT sirens for high-severity warnings
+    if warning.get("alert_level") in ("warning", "evacuate"):
+        try:
+            from app.db import sirens as siren_db
+            from app.core.geo import haversine
+            nearby_sirens = siren_db.get_sirens_near(
+                warning["latitude"], warning["longitude"],
+                max_km=warning.get("radius_km", 25.0),
+            )
+            for siren in nearby_sirens:
+                if siren["status"] in ("offline", "maintenance"):
+                    continue
+                siren_db.log_activation(
+                    siren_id=siren["id"],
+                    warning_id=warning["id"],
+                    trigger_type="auto",
+                    triggered_by="broadcast_warning",
+                    status="triggered",
+                )
+                siren_db.update_siren_status(siren["id"], "active")
+                result.sirens_triggered += 1
+                logger.info(
+                    "Siren %s (%s) auto-triggered for warning %s",
+                    siren["id"], siren["name"], warning["id"],
+                )
+        except Exception as exc:
+            logger.error("Siren auto-trigger failed: %s", exc)
 
     return result
 
