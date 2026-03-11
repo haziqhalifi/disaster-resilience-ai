@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:disaster_resilience_ai/services/chatbot_service.dart';
+import 'package:disaster_resilience_ai/ui/quiz_page.dart';
+import 'package:disaster_resilience_ai/localization/app_language.dart';
 
 /// Educational content for each hazard type, split into Before / During / After.
 class _PhaseContent {
@@ -344,6 +346,13 @@ class _LearnModulePageState extends State<LearnModulePage>
     );
   }
 
+  String _tr({required String en, required String ms, String? zh}) {
+    final lang = AppLanguageScope.of(context).language;
+    if (lang == AppLanguage.malay) return ms;
+    if (lang == AppLanguage.chinese) return zh ?? en;
+    return en;
+  }
+
   @override
   void dispose() {
     _tabCtrl.dispose();
@@ -450,6 +459,27 @@ class _LearnModulePageState extends State<LearnModulePage>
           _buildPhaseTab(_mod.after, isDark),
           _buildChatTab(isDark),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => QuizPage(
+              hazardType: widget.hazardType,
+              hazardTitle: _mod.heroTitle,
+              themeColor: _mod.color,
+            ),
+          ),
+        ),
+        backgroundColor: _mod.color,
+        icon: const Icon(Icons.quiz_rounded, color: Colors.white),
+        label: Text(
+          _tr(en: 'Take Quiz', ms: 'Ambil Kuiz', zh: '参加测验'),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }
@@ -753,7 +783,7 @@ class _LearnModulePageState extends State<LearnModulePage>
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemCount: _mod.chatSuggestions.length,
         itemBuilder: (ctx, i) => ActionChip(
           label: Text(
