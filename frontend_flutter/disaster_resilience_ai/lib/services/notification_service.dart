@@ -25,6 +25,7 @@ class NotificationService {
 
   Timer? _timer;
   bool _initialized = false;
+  String? _accessToken;
   double? _userLat;
   double? _userLon;
 
@@ -73,6 +74,7 @@ class NotificationService {
     required double latitude,
     required double longitude,
   }) {
+    _accessToken = accessToken;
     _userLat = latitude;
     _userLon = longitude;
     _timer?.cancel();
@@ -243,23 +245,38 @@ class NotificationService {
         'Notifications are not available on this platform or init() was not called.',
       );
     }
+    if (_accessToken == null || _accessToken!.isEmpty) {
+      throw StateError(
+        'User session is unavailable for creating a real warning.',
+      );
+    }
 
-    final warning = Warning(
-      id: 'test-${DateTime.now().millisecondsSinceEpoch}',
-      title: 'Emergency Drill: Flash Flood Warning',
+    // Dengkil flood test coordinates.
+    const dengkilLat = 2.8595;
+    const dengkilLon = 101.6781;
+
+    final notifyResult = await _api.createWarning(
+      accessToken: _accessToken!,
+      title: 'TEST ALERT: Flood Warning - Dengkil',
       description:
-          'This is a test of the emergency incoming alert. Move to higher ground and review your evacuation plan.',
-      hazardType: HazardType.flood,
-      alertLevel: AlertLevel.warning,
-      location: GeoPoint(
-        latitude: _userLat ?? 3.1390,
-        longitude: _userLon ?? 101.6869,
-      ),
-      radiusKm: 5,
+          'Real emergency test alert for Dengkil flood response. Proceed to safe high ground and review evacuation route now.',
+      hazardType: 'flood',
+      alertLevel: 'warning',
+      latitude: dengkilLat,
+      longitude: dengkilLon,
+      radiusKm: 8.0,
       source: 'Test Mode',
-      createdAt: DateTime.now(),
-      active: true,
     );
+
+    final warningId = notifyResult['warning_id'] as String?;
+    if (warningId == null || warningId.isEmpty) {
+      throw StateError(
+        'Backend did not return a warning ID for the test alert.',
+      );
+    }
+
+    final warningJson = await _api.fetchWarning(warningId);
+    final warning = Warning.fromJson(warningJson);
 
     _recentWarnings = [warning, ..._recentWarnings.take(9)];
 

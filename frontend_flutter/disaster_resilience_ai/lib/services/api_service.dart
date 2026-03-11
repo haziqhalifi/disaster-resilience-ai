@@ -259,6 +259,42 @@ class ApiService {
     throw Exception('Warning not found');
   }
 
+  /// Create and broadcast a new warning.
+  /// Returns notify result containing warning_id and delivery stats.
+  Future<Map<String, dynamic>> createWarning({
+    required String accessToken,
+    required String title,
+    required String description,
+    required String hazardType,
+    required String alertLevel,
+    required double latitude,
+    required double longitude,
+    required double radiusKm,
+    String source = 'system',
+  }) async {
+    final response = await _postWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/warnings'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+      body: {
+        'title': title,
+        'description': description,
+        'hazard_type': hazardType,
+        'alert_level': alertLevel,
+        'location': {'latitude': latitude, 'longitude': longitude},
+        'radius_km': radiusKm,
+        'source': source,
+      },
+    );
+
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
   /// Update the authenticated user's GPS location so the backend
   /// can send hyper-local warnings.
   Future<Map<String, dynamic>> updateLocation({
