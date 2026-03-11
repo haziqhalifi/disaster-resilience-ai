@@ -1,11 +1,18 @@
 """APScheduler background jobs.
 
 Jobs:
+<<<<<<< ai_prediction
+  fetch_metmalaysia      every 5 minutes  — fetch gov flood warnings
+  monitor_flood_reports  every 2 minutes  — send SMS for newly validated flood reports
+  ai_validate_reports    every 3 minutes  — AI re-scores pending reports, auto-validates high-confidence
+  expire_old_reports     daily at midnight
+=======
   fetch_metmalaysia       every 5 minutes  — fetch gov flood warnings
   monitor_flood_reports   every 2 minutes  — send SMS for newly validated flood reports
   ai_validate_reports     every 3 minutes  — AI re-scores pending reports
   check_siren_auto_stop   every 1 minute   — auto-stop sirens whose warning expired
   expire_old_reports      daily at midnight
+>>>>>>> main
 
 NOTE: The sync Supabase client calls are wrapped in asyncio.to_thread()
 so they run in a thread pool and do NOT block the async event loop.
@@ -63,15 +70,32 @@ async def _job_expire_old_reports() -> None:
 
 
 async def _job_ai_validate_reports() -> None:
+<<<<<<< ai_prediction
+    """AI re-scores pending reports and auto-validates high-confidence ones.
+
+    - Pending reports aged 5 min – 24 h are fetched
+    - Each is scored by the ReportCredibilityModel
+    - Reports with confidence >= 0.75 AND vouch_count >= 1 are auto-validated
+    - Reports with confidence < 0.3 AND age > 6 h are auto-rejected
+    """
+=======
     """AI re-scores pending reports and auto-validates high-confidence ones."""
+>>>>>>> main
     try:
         from app.db import reports as report_db
         from app.db.risk_zones import get_all_risk_zones
         from app.core.geo import haversine
         from ai_models.services.inference import score_report
+<<<<<<< ai_prediction
+
+        pending = await asyncio.to_thread(
+            report_db.get_pending_reports_for_ai_review,
+        )
+=======
         from datetime import datetime, timezone
 
         pending = await asyncio.to_thread(report_db.get_pending_reports_for_ai_review)
+>>>>>>> main
         if not pending:
             return
 
@@ -80,6 +104,10 @@ async def _job_ai_validate_reports() -> None:
 
         for report in pending:
             try:
+<<<<<<< ai_prediction
+                # compute proximity to nearest risk zone
+=======
+>>>>>>> main
                 prox = 50.0
                 r_lat, r_lon = report.get("latitude"), report.get("longitude")
                 if r_lat and r_lon and risk_zones:
@@ -92,10 +120,20 @@ async def _job_ai_validate_reports() -> None:
                     report_db.count_user_reports, report["user_id"],
                 )
 
+<<<<<<< ai_prediction
+                from datetime import datetime, timezone
+                created = datetime.fromisoformat(
+                    report["created_at"].replace("Z", "+00:00")
+                )
+                age_h = (
+                    datetime.now(timezone.utc) - created
+                ).total_seconds() / 3600
+=======
                 created = datetime.fromisoformat(
                     report["created_at"].replace("Z", "+00:00")
                 )
                 age_h = (datetime.now(timezone.utc) - created).total_seconds() / 3600
+>>>>>>> main
 
                 ai = score_report(
                     vouch_count=report.get("vouch_count", 0),
@@ -112,6 +150,10 @@ async def _job_ai_validate_reports() -> None:
                 )
                 rescored += 1
 
+<<<<<<< ai_prediction
+                # auto-validate high-confidence reports with community support
+=======
+>>>>>>> main
                 if score >= 0.75 and report.get("vouch_count", 0) >= 1:
                     await asyncio.to_thread(
                         report_db.validate_report,
@@ -119,6 +161,14 @@ async def _job_ai_validate_reports() -> None:
                         validated_by="ai-auto-validator",
                     )
                     validated += 1
+<<<<<<< ai_prediction
+                    logger.info(
+                        "[scheduler] Auto-validated report %s (confidence=%.2f, vouches=%d)",
+                        report["id"], score, report.get("vouch_count", 0),
+                    )
+                # auto-reject stale low-confidence reports
+=======
+>>>>>>> main
                 elif score < 0.3 and age_h > 6:
                     await asyncio.to_thread(
                         report_db.reject_report,
@@ -127,8 +177,17 @@ async def _job_ai_validate_reports() -> None:
                         reason=f"Low AI confidence ({score:.2f}) and stale ({age_h:.0f}h old)",
                     )
                     rejected += 1
+<<<<<<< ai_prediction
+
+            except Exception as exc:
+                logger.error(
+                    "[scheduler] AI scoring failed for report %s: %s",
+                    report["id"], exc,
+                )
+=======
             except Exception as exc:
                 logger.error("[scheduler] AI scoring failed for report %s: %s", report["id"], exc)
+>>>>>>> main
 
         logger.info(
             "[scheduler] AI review: %d rescored, %d auto-validated, %d auto-rejected",
@@ -138,6 +197,8 @@ async def _job_ai_validate_reports() -> None:
         logger.error("[scheduler] ai_validate_reports failed: %s", exc)
 
 
+<<<<<<< ai_prediction
+=======
 async def _job_check_siren_auto_stop() -> None:
     """Auto-stop sirens whose triggering warning is no longer active."""
     try:
@@ -176,14 +237,21 @@ async def _job_check_siren_auto_stop() -> None:
         logger.error("[scheduler] check_siren_auto_stop failed: %s", exc)
 
 
+>>>>>>> main
 def start_scheduler() -> None:
     scheduler.add_job(_job_fetch_metmalaysia,     "interval", minutes=5,  id="metmalaysia")
     scheduler.add_job(_job_monitor_flood_reports, "interval", minutes=2,  id="flood_monitor")
     scheduler.add_job(_job_ai_validate_reports,   "interval", minutes=3,  id="ai_validate")
+<<<<<<< ai_prediction
+    scheduler.add_job(_job_expire_old_reports,    "cron",     hour=0, minute=0, id="expire")
+    scheduler.start()
+    logger.info("[scheduler] Started — 4 jobs registered")
+=======
     scheduler.add_job(_job_check_siren_auto_stop, "interval", minutes=1,  id="siren_auto_stop")
     scheduler.add_job(_job_expire_old_reports,    "cron",     hour=0, minute=0, id="expire")
     scheduler.start()
     logger.info("[scheduler] Started — 5 jobs registered")
+>>>>>>> main
 
 
 def stop_scheduler() -> None:
