@@ -33,6 +33,7 @@ class ReportCreate(BaseModel):
     latitude:         float = Field(..., ge=-90,  le=90)
     longitude:        float = Field(..., ge=-180, le=180)
     vulnerable_person: bool = False
+    media_urls:       list[str] = Field(default_factory=list, max_length=6)
 
 
 class ReportDescriptionUpdate(BaseModel):
@@ -41,6 +42,11 @@ class ReportDescriptionUpdate(BaseModel):
 
 class ReportRejectRequest(BaseModel):
     reason: str = Field(..., min_length=1, max_length=500)
+
+
+class ReportMediaUploadOut(BaseModel):
+    url: str
+    media_type: str
 
 
 # ── Responses ─────────────────────────────────────────────────────────────────
@@ -55,6 +61,7 @@ class ReportOut(BaseModel):
     longitude:          float
     status:             str
     vulnerable_person:  bool
+    media_urls:         list[str] = Field(default_factory=list)
     vouch_count:        int
     helpful_count:      int
     confidence_score:   float | None = None

@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart'
-  show TargetPlatform, defaultTargetPlatform, kIsWeb;
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 class AuthResult {
   final String accessToken;
@@ -90,11 +92,7 @@ class ApiService {
   }) async {
     final response = await _postWithNetworkHandling(
       Uri.parse('$baseUrl/api/v1/auth/signup'),
-      body: {
-        'username': username,
-        'email': email,
-        'password': password,
-      },
+      body: {'username': username, 'email': email, 'password': password},
     );
 
     if (response.statusCode == 201) {
@@ -159,10 +157,7 @@ class ApiService {
       return await _client
           .post(
             uri,
-            headers: {
-              'Content-Type': 'application/json',
-              ...?headers,
-            },
+            headers: {'Content-Type': 'application/json', ...?headers},
             body: jsonEncode(body),
           )
           .timeout(_requestTimeout);
@@ -178,9 +173,7 @@ class ApiService {
     Map<String, String>? headers,
   }) async {
     try {
-      return await _client
-          .get(uri, headers: headers)
-          .timeout(_requestTimeout);
+      return await _client.get(uri, headers: headers).timeout(_requestTimeout);
     } on TimeoutException {
       throw Exception(_connectivityErrorMessage());
     } on http.ClientException {
@@ -436,6 +429,71 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
     throw Exception(_extractErrorMessage(response));
+  }
+
+  // ── Community Reports ─────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> uploadReportMedia({
+    required String accessToken,
+    required Uint8List bytes,
+    required String filename,
+    required String contentType,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/api/v1/reports/media/upload'),
+    );
+    request.headers['Authorization'] = 'Bearer $accessToken';
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: _parseMediaType(contentType),
+      ),
+    );
+
+    final streamed = await request.send().timeout(_requestTimeout);
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
+  Future<Map<String, dynamic>> submitCommunityReport({
+    required String accessToken,
+    required String reportType,
+    required String description,
+    required String locationName,
+    required double latitude,
+    required double longitude,
+    bool vulnerablePerson = false,
+    List<String> mediaUrls = const [],
+  }) async {
+    final response = await _postWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/reports/submit'),
+      headers: {'Authorization': 'Bearer $accessToken'},
+      body: {
+        'report_type': reportType,
+        'description': description,
+        'location_name': locationName,
+        'latitude': latitude,
+        'longitude': longitude,
+        'vulnerable_person': vulnerablePerson,
+        'media_urls': mediaUrls,
+      },
+    );
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
+  MediaType? _parseMediaType(String contentType) {
+    final chunks = contentType.split('/');
+    if (chunks.length != 2) return null;
+    return MediaType(chunks[0], chunks[1]);
   }
 
   /// Generic GET that returns decoded JSON or null on failure.
