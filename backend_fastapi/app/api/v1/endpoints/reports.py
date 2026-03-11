@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 
 from app.api.v1.dependencies import get_current_user
 from app.db import reports as report_db
 from app.schemas.report import (
     BoundingBoxQuery, HelpfulOut, ReportCreate,
-    ReportDescriptionUpdate, ReportList, ReportOut,
+    ReportDescriptionUpdate, ReportList, ReportMediaUploadOut, ReportOut,
     ReportRejectRequest, VouchOut,
 )
 from app.schemas.user import UserOut
@@ -19,6 +21,17 @@ from app.schemas.user import UserOut
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+_MEDIA_DIR = Path(__file__).resolve().parents[4] / "uploads" / "reports"
+_ALLOWED_MEDIA = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "video/mp4",
+    "video/quicktime",
+    "video/webm",
+}
+_MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
 
 def _to_out(row: dict, current_user_id: str | None = None) -> ReportOut:
@@ -34,6 +47,7 @@ def _to_out(row: dict, current_user_id: str | None = None) -> ReportOut:
         longitude=row["longitude"],
         status=row["status"],
         vulnerable_person=row.get("vulnerable_person", False),
+        media_urls=row.get("media_urls") or [],
         vouch_count=row.get("vouch_count", 0),
         helpful_count=row.get("helpful_count", 0),
         confidence_score=row.get("confidence_score"),
@@ -43,6 +57,34 @@ def _to_out(row: dict, current_user_id: str | None = None) -> ReportOut:
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
+
+
+@router.post("/media/upload", response_model=ReportMediaUploadOut, status_code=status.HTTP_201_CREATED)
+async def upload_report_media(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: UserOut = Depends(get_current_user),
+) -> ReportMediaUploadOut:
+    if file.content_type not in _ALLOWED_MEDIA:
+        raise HTTPException(status_code=415, detail="Unsupported media type")
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file")
+    if len(data) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="File too large (max 25MB)")
+
+    _MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    suffix = Path(file.filename or "upload").suffix or (
+        ".jpg" if (file.content_type or "").startswith("image/") else ".mp4"
+    )
+    safe_name = f"{current_user.id}_{uuid.uuid4().hex}{suffix}"
+    out_path = _MEDIA_DIR / safe_name
+    out_path.write_bytes(data)
+
+    media_url = f"{request.base_url}uploads/reports/{safe_name}"
+    media_type = "video" if (file.content_type or "").startswith("video/") else "image"
+    return ReportMediaUploadOut(url=media_url, media_type=media_type)
 
 
 @router.post("/submit", response_model=ReportOut, status_code=status.HTTP_201_CREATED)
@@ -58,6 +100,7 @@ async def submit_report(
         latitude=body.latitude,
         longitude=body.longitude,
         vulnerable_person=body.vulnerable_person,
+        media_urls=body.media_urls,
     )
 
     # ── AI credibility scoring ────────────────────────────────────────────

@@ -5,9 +5,11 @@ Run with:
 """
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.endpoints import (
     admin, alerts, auth, devices, family, preparedness,
@@ -39,6 +41,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+_upload_dir = Path(__file__).resolve().parents[1] / "uploads"
+_upload_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(_upload_dir)), name="uploads")
 
 # ── Routes ──────────────────────────────────────────────────────────────────
 

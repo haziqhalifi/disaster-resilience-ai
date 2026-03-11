@@ -20,6 +20,7 @@ class ReportRecord(TypedDict):
     longitude:        float
     status:           str
     vulnerable_person: bool
+    media_urls:       list[str]
     vouch_count:      int
     helpful_count:    int
     confidence_score: float | None
@@ -42,6 +43,7 @@ def create_report(
     latitude: float,
     longitude: float,
     vulnerable_person: bool = False,
+    media_urls: list[str] | None = None,
 ) -> ReportRecord:
     sb = get_client()
     now = datetime.now(timezone.utc).isoformat()
@@ -55,6 +57,7 @@ def create_report(
         "longitude":       longitude,
         "status":          "pending",
         "vulnerable_person": vulnerable_person,
+        "media_urls":      media_urls or [],
         "vouch_count":     0,
         "helpful_count":   0,
         "created_at":      now,

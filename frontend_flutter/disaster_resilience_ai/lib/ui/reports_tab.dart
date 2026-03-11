@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'package:file_picker/file_picker.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:disaster_resilience_ai/localization/app_language.dart';
+import 'package:disaster_resilience_ai/services/api_service.dart';
+import 'package:disaster_resilience_ai/services/weather_service.dart';
 
 class ReportsTab extends StatefulWidget {
   const ReportsTab({super.key});
@@ -420,12 +425,184 @@ class _InlineNewReportFormState extends State<_InlineNewReportForm> {
   int _selectedIncident = 0;
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final ApiService _api = ApiService();
+  final WeatherService _weatherService = WeatherService();
+  final List<Map<String, String>> _media = [];
+  bool _submitting = false;
 
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  Future<String?> _token() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('auth_access_token');
+  }
+
+  Future<Map<String, dynamic>> _resolveLocation() async {
+    const fallbackLat = 3.8077;
+    const fallbackLon = 103.3260;
+    const fallbackName = 'Kuantan, Pahang';
+
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission != LocationPermission.always &&
+          permission != LocationPermission.whileInUse) {
+        return {
+          'latitude': fallbackLat,
+          'longitude': fallbackLon,
+          'location_name': fallbackName,
+        };
+      }
+      final pos = await Geolocator.getCurrentPosition();
+      final place = await _weatherService.fetchLocationName(
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+      );
+      return {
+        'latitude': pos.latitude,
+        'longitude': pos.longitude,
+        'location_name': (place != null && place.isNotEmpty)
+            ? place
+            : fallbackName,
+      };
+    } catch (_) {
+      return {
+        'latitude': fallbackLat,
+        'longitude': fallbackLon,
+        'location_name': fallbackName,
+      };
+    }
+  }
+
+  String _incidentToReportType(int selected) {
+    switch (selected) {
+      case 0:
+        return 'flood';
+      case 1:
+      case 2:
+        return 'landslide';
+      case 3:
+      default:
+        return 'blocked_road';
+    }
+  }
+
+  Future<void> _pickAndUploadMedia({required bool video}) async {
+    final token = await _token();
+    if (token == null || token.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Please sign in again.')));
+      }
+      return;
+    }
+
+    final picked = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      type: video ? FileType.video : FileType.image,
+      withData: true,
+    );
+    if (picked == null || picked.files.isEmpty) return;
+
+    for (final file in picked.files) {
+      final bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) continue;
+      final filename = file.name;
+      final ext = filename.toLowerCase();
+      final contentType = video
+          ? (ext.endsWith('.webm')
+                ? 'video/webm'
+                : ext.endsWith('.mov')
+                ? 'video/quicktime'
+                : 'video/mp4')
+          : (ext.endsWith('.png')
+                ? 'image/png'
+                : ext.endsWith('.webp')
+                ? 'image/webp'
+                : 'image/jpeg');
+
+      try {
+        final res = await _api.uploadReportMedia(
+          accessToken: token,
+          bytes: bytes,
+          filename: filename,
+          contentType: contentType,
+        );
+        final url = res['url']?.toString();
+        final mediaType =
+            res['media_type']?.toString() ?? (video ? 'video' : 'image');
+        if (url != null && url.isNotEmpty && mounted) {
+          setState(() => _media.add({'url': url, 'type': mediaType}));
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+        }
+      }
+    }
+  }
+
+  Future<void> _submitReport() async {
+    final token = await _token();
+    if (token == null || token.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Please sign in again.')));
+      }
+      return;
+    }
+
+    final title = _titleController.text.trim();
+    final desc = _descriptionController.text.trim();
+    final description = [title, desc].where((s) => s.isNotEmpty).join('\n\n');
+    if (description.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please add report details first.')),
+        );
+      }
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      final loc = await _resolveLocation();
+      await _api.submitCommunityReport(
+        accessToken: token,
+        reportType: _incidentToReportType(_selectedIncident),
+        description: description,
+        locationName: loc['location_name'] as String,
+        latitude: (loc['latitude'] as num).toDouble(),
+        longitude: (loc['longitude'] as num).toDouble(),
+        mediaUrls: _media.map((m) => m['url']!).toList(),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Report submitted successfully.')),
+        );
+        widget.onBack();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Submit failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -611,6 +788,7 @@ class _InlineNewReportFormState extends State<_InlineNewReportForm> {
                     label: tr(en: 'Add Photos', ms: 'Tambah Foto', zh: '添加照片'),
                     border: border,
                     isDark: isDark,
+                    onTap: () => _pickAndUploadMedia(video: false),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -620,10 +798,29 @@ class _InlineNewReportFormState extends State<_InlineNewReportForm> {
                     label: tr(en: 'Add Video', ms: 'Tambah Video', zh: '添加视频'),
                     border: border,
                     isDark: isDark,
+                    onTap: () => _pickAndUploadMedia(video: true),
                   ),
                 ),
               ],
             ),
+            if (_media.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _media
+                    .asMap()
+                    .entries
+                    .map(
+                      (entry) => Chip(
+                        label: Text('${entry.value['type']} ${entry.key + 1}'),
+                        onDeleted: () =>
+                            setState(() => _media.removeAt(entry.key)),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
             const SizedBox(height: 22),
             Text(
               tr(en: 'REPORT DETAILS', ms: 'BUTIRAN LAPORAN', zh: '报告详情'),
@@ -726,7 +923,7 @@ class _InlineNewReportFormState extends State<_InlineNewReportForm> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: _submitting ? null : _submitReport,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: accent,
                   foregroundColor: Colors.white,
@@ -736,13 +933,26 @@ class _InlineNewReportFormState extends State<_InlineNewReportForm> {
                   ),
                   elevation: 0,
                 ),
-                child: Text(
-                  tr(en: 'Submit Report', ms: 'Hantar Laporan', zh: '提交报告'),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                child: _submitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(
+                        tr(
+                          en: 'Submit Report',
+                          ms: 'Hantar Laporan',
+                          zh: '提交报告',
+                        ),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
               ),
             ),
           ],
@@ -821,11 +1031,12 @@ class _InlineNewReportFormState extends State<_InlineNewReportForm> {
     required String label,
     required Color border,
     required bool isDark,
+    required VoidCallback onTap,
   }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {},
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: CustomPaint(
           painter: _DashedRRectPainter(
