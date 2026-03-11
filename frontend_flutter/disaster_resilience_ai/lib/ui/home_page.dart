@@ -108,9 +108,9 @@ class _HomePageState extends State<HomePage> {
           _userLat = position.latitude;
           _userLon = position.longitude;
           _locationLabel = _tr(
-            en: 'Current location',
-            ms: 'Lokasi semasa',
-            zh: '当前位置',
+            en: 'Updating location...',
+            ms: 'Mengemas kini lokasi...',
+            zh: '正在更新位置...',
           );
         });
       }
@@ -166,9 +166,15 @@ class _HomePageState extends State<HomePage> {
         setState(() {
           _userLat = position.latitude;
           _userLon = position.longitude;
-          _locationLabel =
-              '${position.latitude.toStringAsFixed(4)}°N, ${position.longitude.toStringAsFixed(4)}°E';
         });
+
+        final place = await _weatherService.fetchLocationName(
+          latitude: position.latitude,
+          longitude: position.longitude,
+        );
+        if (mounted && place != null && place.isNotEmpty) {
+          setState(() => _locationLabel = place);
+        }
 
         await _updateBackendLocation();
       } catch (_) {

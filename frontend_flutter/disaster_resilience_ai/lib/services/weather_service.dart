@@ -6,6 +6,8 @@ class WeatherService {
   static const String _baseUrl = 'https://api.open-meteo.com/v1/forecast';
   static const String _reverseGeoUrl =
       'https://geocoding-api.open-meteo.com/v1/reverse';
+  static const String _osmReverseGeoUrl =
+      'https://nominatim.openstreetmap.org/reverse';
 
   Future<WeatherData> fetchWeather({
     required double latitude,
@@ -35,6 +37,69 @@ class WeatherService {
   }
 
   Future<String?> fetchLocationName({
+    required double latitude,
+    required double longitude,
+  }) async {
+    final exact = await _fetchExactLocationName(
+      latitude: latitude,
+      longitude: longitude,
+    );
+    if (exact != null && exact.isNotEmpty) {
+      return exact;
+    }
+
+    return _fetchApproximateLocationName(
+      latitude: latitude,
+      longitude: longitude,
+    );
+  }
+
+  Future<String?> _fetchExactLocationName({
+    required double latitude,
+    required double longitude,
+  }) async {
+    final uri = Uri.parse(_osmReverseGeoUrl).replace(
+      queryParameters: {
+        'lat': latitude.toString(),
+        'lon': longitude.toString(),
+        'format': 'jsonv2',
+        'zoom': '18',
+        'addressdetails': '1',
+      },
+    );
+
+    final response = await http
+        .get(
+          uri,
+          headers: {
+            'User-Agent': 'DisasterResilienceAI/1.0 (contact: app-client)',
+          },
+        )
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode != 200) {
+      return null;
+    }
+
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final displayName = json['display_name']?.toString();
+    if (displayName == null || displayName.isEmpty) {
+      return null;
+    }
+
+    // Keep label readable while still specific.
+    final parts = displayName
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) {
+      return null;
+    }
+    return parts.take(3).join(', ');
+  }
+
+  Future<String?> _fetchApproximateLocationName({
     required double latitude,
     required double longitude,
   }) async {
