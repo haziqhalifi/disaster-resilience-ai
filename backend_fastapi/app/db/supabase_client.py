@@ -21,7 +21,8 @@ from supabase import Client, ClientOptions, create_client
 
 # Always re-read the .env so that a hot-reload (uvicorn --reload) picks up
 # any key changes without requiring a full process restart.
-_env_path = Path(__file__).resolve().parents[3] / ".env"
+# backend_fastapi/app/db/supabase_client.py -> parents[2] == backend_fastapi
+_env_path = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(_env_path, override=True)
 
 
