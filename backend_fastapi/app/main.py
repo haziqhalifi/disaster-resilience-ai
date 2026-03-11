@@ -9,6 +9,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1.endpoints import (
+    admin, alerts, auth, devices, family, preparedness,
+    profile, reports, risk_map, sirens, sms, warnings,
+)
 from app.api.v1.endpoints import alerts, auth, devices, family, preparedness, profile, reports, risk_map, warnings
 from app.api.v1.endpoints import admin, learn, sms
 from app.scheduler import start_scheduler, stop_scheduler
@@ -19,6 +23,7 @@ async def lifespan(app: FastAPI):
     start_scheduler()
     yield
     stop_scheduler()
+
 
 app = FastAPI(
     title="Disaster Resilience AI API",
@@ -48,6 +53,7 @@ app.include_router(preparedness.router,  prefix="/api/v1/preparedness",   tags=[
 app.include_router(family.router,        prefix="/api/v1/family",         tags=["family"])
 app.include_router(admin.router,         prefix="/api/v1/admin",          tags=["admin"])
 app.include_router(sms.router,           prefix="/api/v1/sms",            tags=["sms"])
+app.include_router(sirens.router,        prefix="/api/v1/sirens",         tags=["sirens"])
 app.include_router(learn.router,         prefix="/api/v1/learn",          tags=["learn"])
 
 

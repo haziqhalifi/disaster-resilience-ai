@@ -24,6 +24,8 @@ import 'package:disaster_resilience_ai/ui/all_news_page.dart';
 import 'package:disaster_resilience_ai/ui/widgets/landa_wordmark.dart';
 import 'package:disaster_resilience_ai/services/notification_service.dart';
 import 'package:disaster_resilience_ai/ui/incoming_alert_page.dart';
+import 'package:disaster_resilience_ai/ui/siren_management_page.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -1069,6 +1071,8 @@ class _HomePageState extends State<HomePage> {
           email: widget.email,
           onLogout: _logout,
         );
+      case 4:
+        return SirenManagementPage(accessToken: widget.accessToken);
       default:
         return _buildDashboard();
     }
@@ -1277,6 +1281,12 @@ class _HomePageState extends State<HomePage> {
               icon: Icons.person_outline,
               selectedIcon: Icons.person,
             ),
+            if (kIsWeb)
+              _buildNavDestination(
+                label: _tr(en: 'Admin', ms: 'Admin', zh: '管理'),
+                icon: Icons.admin_panel_settings_outlined,
+                selectedIcon: Icons.admin_panel_settings,
+              ),
           ],
         ),
       ),
