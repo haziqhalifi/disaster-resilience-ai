@@ -60,6 +60,7 @@ class NotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >();
     await androidPlugin?.requestNotificationsPermission();
+    await androidPlugin?.requestFullScreenIntentPermission();
     _initialized = true;
   }
 
@@ -158,13 +159,13 @@ class NotificationService {
 
     switch (warning.alertLevel) {
       case AlertLevel.evacuate:
-        channelId = 'disaster_evacuate';
+        channelId = 'disaster_evacuate_v2';
         channelName = 'Evacuation Alerts';
         importance = Importance.max;
         priority = Priority.max;
         isEmergency = true;
       case AlertLevel.warning:
-        channelId = 'disaster_warning';
+        channelId = 'disaster_warning_v2';
         channelName = 'Warnings';
         importance = Importance.max;
         priority = Priority.max;
@@ -200,12 +201,13 @@ class NotificationService {
           ? const RawResourceAndroidNotificationSound('alarm')
           : null,
       playSound: true,
+      audioAttributesUsage: AudioAttributesUsage.alarm,
       enableVibration: true,
       vibrationPattern: vibrationPattern,
       ongoing: isEmergency,
       autoCancel: !isEmergency,
       fullScreenIntent: isEmergency,
-      category: isEmergency ? AndroidNotificationCategory.alarm : null,
+      category: isEmergency ? AndroidNotificationCategory.call : null,
       visibility: NotificationVisibility.public,
       styleInformation: BigTextStyleInformation(
         '${warning.hazardType.displayName} — ${warning.description}',
@@ -234,26 +236,37 @@ class NotificationService {
     }
   }
 
-  /// Fire a test notification immediately to verify the system works.
+  /// Fire a test emergency alert to verify call-style warning UX works.
   Future<void> showTestNotification() async {
     if (!_initialized) {
       throw StateError(
         'Notifications are not available on this platform or init() was not called.',
       );
     }
-    const androidDetails = AndroidNotificationDetails(
-      'disaster_test',
-      'Test Notifications',
-      channelDescription: 'Used to verify notifications are working',
-      importance: Importance.max,
-      priority: Priority.high,
-      autoCancel: true,
+
+    final warning = Warning(
+      id: 'test-${DateTime.now().millisecondsSinceEpoch}',
+      title: 'Emergency Drill: Flash Flood Warning',
+      description:
+          'This is a test of the emergency incoming alert. Move to higher ground and review your evacuation plan.',
+      hazardType: HazardType.flood,
+      alertLevel: AlertLevel.warning,
+      location: GeoPoint(
+        latitude: _userLat ?? 3.1390,
+        longitude: _userLon ?? 101.6869,
+      ),
+      radiusKm: 5,
+      source: 'Test Mode',
+      createdAt: DateTime.now(),
+      active: true,
     );
-    await _plugin.show(
-      0,
-      '\u2705 Notifications are working!',
-      'You will receive alerts like this when a disaster warning is issued.',
-      const NotificationDetails(android: androidDetails),
-    );
+
+    _recentWarnings = [warning, ..._recentWarnings.take(9)];
+
+    // Trigger call-style screen first, then also post a tray notification.
+    if (onEmergencyAlert != null) {
+      onEmergencyAlert!(warning);
+    }
+    await _showNotification(warning);
   }
 }

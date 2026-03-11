@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -22,12 +23,19 @@ class IncomingAlertPage extends StatefulWidget {
 
 class _IncomingAlertPageState extends State<IncomingAlertPage>
     with TickerProviderStateMixin {
+  static const int _dismissLockSeconds = 12;
+
   late final AnimationController _pulseController;
   late final AnimationController _slideController;
   late final Animation<double> _pulseAnimation;
   late final Animation<Offset> _slideAnimation;
 
+  int _dismissCountdown = _dismissLockSeconds;
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _assetAlarmPlaying = false;
   Timer? _vibrationTimer;
+  Timer? _ringTimer;
+  Timer? _dismissCountdownTimer;
 
   @override
   void initState() {
@@ -47,15 +55,15 @@ class _IncomingAlertPageState extends State<IncomingAlertPage>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     )..forward();
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 1),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
-    );
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+        .animate(
+          CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+        );
 
     // ── Continuous vibration pattern ──
     _startVibrationLoop();
+    unawaited(_startRingingLoop());
+    _startDismissCountdown();
 
     // ── Force the screen to stay on and show over the lock screen ──
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -69,11 +77,56 @@ class _IncomingAlertPageState extends State<IncomingAlertPage>
     });
   }
 
+  Future<void> _startRingingLoop() async {
+    try {
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _audioPlayer.setVolume(1.0);
+      await _audioPlayer.play(AssetSource('sounds/alarm.wav'));
+      _assetAlarmPlaying = true;
+    } catch (_) {
+      _assetAlarmPlaying = false;
+      SystemSound.play(SystemSoundType.alert);
+    }
+
+    _ringTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
+      if (!_assetAlarmPlaying) {
+        SystemSound.play(SystemSoundType.alert);
+      }
+      HapticFeedback.heavyImpact();
+    });
+  }
+
+  void _startDismissCountdown() {
+    _dismissCountdownTimer = Timer.periodic(const Duration(seconds: 1), (
+      timer,
+    ) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_dismissCountdown <= 1) {
+        setState(() => _dismissCountdown = 0);
+        timer.cancel();
+        return;
+      }
+      setState(() => _dismissCountdown -= 1);
+    });
+  }
+
+  void _stopAlertEffects() {
+    _vibrationTimer?.cancel();
+    _ringTimer?.cancel();
+    _dismissCountdownTimer?.cancel();
+    _audioPlayer.stop();
+    _assetAlarmPlaying = false;
+  }
+
   @override
   void dispose() {
-    _vibrationTimer?.cancel();
+    _stopAlertEffects();
     _pulseController.dispose();
     _slideController.dispose();
+    _audioPlayer.dispose();
     SystemChrome.setEnabledSystemUIMode(
       SystemUiMode.manual,
       overlays: SystemUiOverlay.values,
@@ -82,6 +135,7 @@ class _IncomingAlertPageState extends State<IncomingAlertPage>
   }
 
   void _acknowledge() {
+    _stopAlertEffects();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => EmergencyAlertPage(warning: widget.warning),
@@ -90,6 +144,8 @@ class _IncomingAlertPageState extends State<IncomingAlertPage>
   }
 
   void _dismiss() {
+    if (_dismissCountdown > 0) return;
+    _stopAlertEffects();
     Navigator.of(context).pop();
   }
 
@@ -100,13 +156,15 @@ class _IncomingAlertPageState extends State<IncomingAlertPage>
     final warning = widget.warning;
     final isEvacuate = warning.alertLevel == AlertLevel.evacuate;
 
-    final Color bgStart =
-        isEvacuate ? const Color(0xFFB71C1C) : const Color(0xFFE65100);
-    final Color bgEnd =
-        isEvacuate ? const Color(0xFF880E0E) : const Color(0xFFBF360C);
+    final Color bgStart = isEvacuate
+        ? const Color(0xFFB71C1C)
+        : const Color(0xFFE65100);
+    final Color bgEnd = isEvacuate
+        ? const Color(0xFF880E0E)
+        : const Color(0xFFBF360C);
 
     return PopScope(
-      canPop: false,
+      canPop: _dismissCountdown == 0,
       child: Scaffold(
         body: Container(
           width: double.infinity,
@@ -176,7 +234,11 @@ class _IncomingAlertPageState extends State<IncomingAlertPage>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.warning_rounded, color: Colors.yellowAccent, size: 18),
+          const Icon(
+            Icons.warning_rounded,
+            color: Colors.yellowAccent,
+            size: 18,
+          ),
           const SizedBox(width: 8),
           Text(
             warning.alertLevel.displayName,
@@ -216,10 +278,7 @@ class _IncomingAlertPageState extends State<IncomingAlertPage>
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.white.withAlpha(30),
-              border: Border.all(
-                color: Colors.white.withAlpha(100),
-                width: 3,
-              ),
+              border: Border.all(color: Colors.white.withAlpha(100), width: 3),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withAlpha(60),
@@ -297,8 +356,11 @@ class _IncomingAlertPageState extends State<IncomingAlertPage>
               children: [
                 Row(
                   children: [
-                    Icon(Icons.record_voice_over,
-                        size: 16, color: Colors.grey[600]),
+                    Icon(
+                      Icons.record_voice_over,
+                      size: 16,
+                      color: Colors.grey[600],
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       'Alert Message',
@@ -325,6 +387,16 @@ class _IncomingAlertPageState extends State<IncomingAlertPage>
             ),
           ),
           const SizedBox(height: 8),
+          if (_dismissCountdown > 0)
+            Text(
+              'Dismiss enabled in ${_dismissCountdown}s',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.red[700],
+              ),
+            ),
+          if (_dismissCountdown > 0) const SizedBox(height: 8),
           // ── Source & time ──
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -351,9 +423,13 @@ class _IncomingAlertPageState extends State<IncomingAlertPage>
               // Dismiss
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: _dismiss,
+                  onPressed: _dismissCountdown == 0 ? _dismiss : null,
                   icon: const Icon(Icons.close, size: 20),
-                  label: const Text('DISMISS'),
+                  label: Text(
+                    _dismissCountdown == 0
+                        ? 'DISMISS'
+                        : 'DISMISS (${_dismissCountdown}s)',
+                  ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.grey[700],
                     side: BorderSide(color: Colors.grey[300]!),

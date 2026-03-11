@@ -1,7 +1,10 @@
 import 'package:disaster_resilience_ai/localization/app_language.dart';
+import 'package:disaster_resilience_ai/models/warning_model.dart';
 import 'package:disaster_resilience_ai/services/notification_service.dart';
 import 'package:disaster_resilience_ai/theme/app_theme.dart';
 import 'package:disaster_resilience_ai/ui/auth_page.dart';
+import 'package:disaster_resilience_ai/ui/emergency_alert_page.dart';
+import 'package:disaster_resilience_ai/ui/incoming_alert_page.dart';
 import 'package:flutter/material.dart';
 
 /// Global navigator key so services can push routes from anywhere.
@@ -11,6 +14,20 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService.instance.init();
   NotificationService.instance.navigatorKey = navigatorKey;
+  NotificationService.instance.onEmergencyAlert = (Warning warning) {
+    final nav = navigatorKey.currentState;
+    if (nav == null) return;
+    nav.push(
+      MaterialPageRoute(builder: (_) => IncomingAlertPage(warning: warning)),
+    );
+  };
+  NotificationService.instance.onWarningTap = (Warning warning) {
+    final nav = navigatorKey.currentState;
+    if (nav == null) return;
+    nav.push(
+      MaterialPageRoute(builder: (_) => EmergencyAlertPage(warning: warning)),
+    );
+  };
 
   final isDarkMode = await AppThemeController.loadInitialDarkMode();
   final initialLanguage = await AppLanguageController.loadInitialLanguage();
