@@ -50,3 +50,29 @@ def get_client() -> Client:
         persist_session=False,
     )
     return create_client(url, key, options=options)
+
+
+@lru_cache(maxsize=1)
+def get_auth_client() -> Client:
+    """Return a client for end-user auth flows.
+
+    Prefer ``SUPABASE_ANON_KEY`` for sign-in/sign-up token issuance.
+    Falls back to ``SUPABASE_KEY`` so local development still works when anon
+    key is not provided.
+    """
+    url = os.getenv("SUPABASE_URL", "")
+    anon_key = os.getenv("SUPABASE_ANON_KEY", "")
+    fallback_key = os.getenv("SUPABASE_KEY", "")
+    key = anon_key or fallback_key
+
+    if not url or not key:
+        raise ValueError(
+            "SUPABASE_URL and SUPABASE_ANON_KEY (or SUPABASE_KEY fallback) "
+            "environment variables must be set."
+        )
+
+    options = ClientOptions(
+        auto_refresh_token=False,
+        persist_session=False,
+    )
+    return create_client(url, key, options=options)

@@ -97,6 +97,15 @@ class WaypointOut(BaseModel):
     lon: float
 
 
+class AdminAreaOut(BaseModel):
+    id: str
+    name: str
+    hazard_type: str
+    risk_score: float = Field(..., ge=0.0, le=1.0)
+    zone_count: int = Field(default=0, ge=0)
+    boundary: list[WaypointOut]
+
+
 class EvacuationRouteCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     start_lat: float = Field(..., ge=-90.0, le=90.0)
@@ -137,3 +146,4 @@ class MapDataResponse(BaseModel):
     risk_zones: list[RiskZoneOut]
     evacuation_centres: list[EvacuationCentreOut]
     evacuation_routes: list[EvacuationRouteOut]
+    admin_areas: list[AdminAreaOut] = Field(default_factory=list)
