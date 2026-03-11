@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app.db import dun_boundaries as dunboundary_db
 from app.api.v1.dependencies import get_current_user
 from app.db import district_boundaries as dboundary_db
 from app.db import risk_zones as rz_db
@@ -112,6 +113,24 @@ def _extract_boundary_from_geometry(geometry: dict) -> list[dict]:
 
 
 def _load_admin_boundaries() -> list[dict]:
+    # Prefer finer-grained DUN boundaries when available.
+    dun_rows = dunboundary_db.list_dun_boundaries(active_only=True)
+    boundaries = []
+    for row in dun_rows:
+        boundary = _extract_boundary_from_geometry(row.get("geometry") or {})
+        if len(boundary) < 3:
+            continue
+        boundaries.append(
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "boundary": boundary,
+            }
+        )
+    if boundaries:
+        return boundaries
+
+    # Fallback to district boundaries for states that do not have DUN data yet.
     rows = dboundary_db.list_district_boundaries(active_only=True)
     boundaries = []
     for row in rows:

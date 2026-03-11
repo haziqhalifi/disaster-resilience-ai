@@ -131,7 +131,7 @@ class _MapTabState extends State<MapTab> {
           userAgentPackageName: 'com.disasterai.disaster_resilience_ai',
         ),
         if (_filteredAdminAreas.isNotEmpty) _buildAdminAreaPolygons(),
-        // Markers: location-based hazard pins + user location
+        // Markers: localized hazard pins + user location
         _buildMarkers(),
       ],
     );
@@ -145,13 +145,14 @@ class _MapTabState extends State<MapTab> {
     final polygons = _filteredAdminAreas.map((area) {
       final points = area.boundary.map((p) => LatLng(p.lat, p.lon)).toList();
       final color = _hazardColor(area.hazardType);
-      final fillAlpha = (35 + (area.riskScore * 90)).round().clamp(35, 125);
+      // Keep DUN highlights subtle because hazards are shown by localized pins.
+      final fillAlpha = (8 + (area.riskScore * 14)).round().clamp(8, 22);
 
       return Polygon(
         points: points,
         color: color.withAlpha(fillAlpha),
-        borderColor: color.withAlpha(220),
-        borderStrokeWidth: 2,
+        borderColor: color.withAlpha(150),
+        borderStrokeWidth: 1.3,
       );
     }).toList();
 
@@ -161,53 +162,14 @@ class _MapTabState extends State<MapTab> {
   MarkerLayer _buildMarkers() {
     final markers = <Marker>[];
 
-    // Area labels for administrative polygons
-    if (_filteredAdminAreas.isNotEmpty) {
-      for (final area in _filteredAdminAreas) {
-        final centre = _areaCentroid(area);
-        markers.add(
-          Marker(
-            point: centre,
-            width: 18,
-            height: 18,
-            child: GestureDetector(
-              onTap: () => _showAdminAreaInfo(area),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: _hazardColor(area.hazardType),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(45),
-                      blurRadius: 3,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Container(
-                    width: 4,
-                    height: 4,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      }
-    } else if (_mapData != null) {
-      // Fallback to zone points if administrative polygons are not available.
+    if (_mapData != null) {
+      // Always use point-level hazards so only localized spots are shown.
       for (final zone in _filteredZones) {
         markers.add(
           Marker(
             point: LatLng(zone.latitude, zone.longitude),
-            width: 14,
-            height: 14,
+            width: 16,
+            height: 16,
             child: GestureDetector(
               onTap: () => _showZoneInfo(zone),
               child: Container(
@@ -224,13 +186,10 @@ class _MapTabState extends State<MapTab> {
                   ],
                 ),
                 child: Center(
-                  child: Container(
-                    width: 3,
-                    height: 3,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
+                  child: Icon(
+                    _hazardIcon(zone.hazardType),
+                    size: 9,
+                    color: Colors.white,
                   ),
                 ),
               ),
