@@ -460,25 +460,27 @@ class ApiService {
     required double longitude,
     double radiusKm = 5.0,
     String? endpointUrl,
+    String? apiKey,
   }) async {
-    final response = await _client.post(
+    final response = await _postWithNetworkHandling(
       Uri.parse('$baseUrl/api/v1/sirens/'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $accessToken',
       },
-      body: jsonEncode({
+      body: {
         'name': name,
         'latitude': latitude,
         'longitude': longitude,
         'radius_km': radiusKm,
         if (endpointUrl != null) 'endpoint_url': endpointUrl,
-      }),
+        if (apiKey != null) 'api_key': apiKey,
+      },
     );
     if (response.statusCode == 201) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
-    throw Exception('Failed to register siren (${response.statusCode})');
+    throw Exception(_extractErrorMessage(response));
   }
 
   Future<Map<String, dynamic>> triggerSiren({

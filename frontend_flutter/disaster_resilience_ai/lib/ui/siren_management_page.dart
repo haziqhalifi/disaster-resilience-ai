@@ -207,7 +207,87 @@ class _SirenManagementPageState extends State<SirenManagementPage> {
               final lat = double.tryParse(latCtrl.text.trim());
               final lon = double.tryParse(lonCtrl.text.trim());
               final radius = double.tryParse(radiusCtrl.text.trim()) ?? 5.0;
-              if (name.isEmpty || lat == null || lon == null) return;
+              final endpoint = endpointCtrl.text.trim();
+              if (name.isEmpty || lat == null || lon == null) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        _tr(
+                          en: 'Please fill name, latitude, and longitude.',
+                          ms: 'Sila isi nama, latitud, dan longitud.',
+                          zh: '请填写名称、纬度和经度。',
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                return;
+              }
+              if (!lat.isFinite || lat < -90 || lat > 90) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        _tr(
+                          en: 'Latitude must be between -90 and 90.',
+                          ms: 'Latitud mesti antara -90 hingga 90.',
+                          zh: '纬度必须在 -90 到 90 之间。',
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                return;
+              }
+              if (!lon.isFinite || lon < -180 || lon > 180) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        _tr(
+                          en: 'Longitude must be between -180 and 180.',
+                          ms: 'Longitud mesti antara -180 hingga 180.',
+                          zh: '经度必须在 -180 到 180 之间。',
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                return;
+              }
+              if (!radius.isFinite || radius <= 0 || radius > 100) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        _tr(
+                          en: 'Radius must be between 0 and 100 km.',
+                          ms: 'Radius mesti antara 0 hingga 100 km.',
+                          zh: '半径必须在 0 到 100 公里之间。',
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                return;
+              }
+              if (endpoint.isNotEmpty && !endpoint.startsWith('http')) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        _tr(
+                          en: 'Endpoint URL must start with http:// or https://',
+                          ms: 'URL endpoint mesti bermula dengan http:// atau https://',
+                          zh: '端点 URL 必须以 http:// 或 https:// 开头',
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                return;
+              }
 
               Navigator.pop(ctx);
               try {
@@ -217,9 +297,7 @@ class _SirenManagementPageState extends State<SirenManagementPage> {
                   latitude: lat,
                   longitude: lon,
                   radiusKm: radius,
-                  endpointUrl: endpointCtrl.text.trim().isNotEmpty
-                      ? endpointCtrl.text.trim()
-                      : null,
+                  endpointUrl: endpoint.isNotEmpty ? endpoint : null,
                 );
                 _fetchSirens();
               } catch (e) {
