@@ -150,16 +150,50 @@ class EvacuationRoute {
   }
 }
 
+/// A hazard-scored administrative area polygon.
+class AdminArea {
+  final String id;
+  final String name;
+  final String hazardType;
+  final double riskScore;
+  final int zoneCount;
+  final List<RouteWaypoint> boundary;
+
+  const AdminArea({
+    required this.id,
+    required this.name,
+    required this.hazardType,
+    required this.riskScore,
+    required this.zoneCount,
+    required this.boundary,
+  });
+
+  factory AdminArea.fromJson(Map<String, dynamic> json) {
+    return AdminArea(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      hazardType: json['hazard_type'] as String,
+      riskScore: (json['risk_score'] as num).toDouble(),
+      zoneCount: json['zone_count'] as int? ?? 0,
+      boundary: (json['boundary'] as List<dynamic>)
+          .map((p) => RouteWaypoint.fromJson(p as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
 /// Combined map data response.
 class MapData {
   final List<RiskZone> riskZones;
   final List<EvacuationCentre> evacuationCentres;
   final List<EvacuationRoute> evacuationRoutes;
+  final List<AdminArea> adminAreas;
 
   const MapData({
     required this.riskZones,
     required this.evacuationCentres,
     required this.evacuationRoutes,
+    required this.adminAreas,
   });
 
   factory MapData.fromJson(Map<String, dynamic> json) {
@@ -172,6 +206,9 @@ class MapData {
           .toList(),
       evacuationRoutes: (json['evacuation_routes'] as List<dynamic>)
           .map((e) => EvacuationRoute.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      adminAreas: ((json['admin_areas'] as List<dynamic>?) ?? const [])
+          .map((e) => AdminArea.fromJson(e as Map<String, dynamic>))
           .toList(),
     );
   }
