@@ -1557,56 +1557,33 @@ class _HomePageState extends State<HomePage> {
           child: Container(height: 1, color: borderColor),
         ),
         actions: [
-          IconButton(
-            tooltip: _tr(en: 'Warnings', ms: 'Amaran', zh: '警报'),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => AllWarningsPage(warnings: _allActiveWarnings),
-              ),
-            ),
-            icon: Stack(
-              children: [
-                const Icon(Icons.notifications_none_rounded),
-                if (_nearbyWarnings.isNotEmpty)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Colors.redAccent,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
           Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: CircleAvatar(
-              backgroundColor: const Color(0xFFE8F5E9),
-              child: IconButton(
-                icon: const Icon(
-                  Icons.person_outline,
-                  color: Color(0xFF2E7D32),
+            padding: const EdgeInsets.only(right: 12),
+            child: IconButton(
+              tooltip: _tr(en: 'Warnings', ms: 'Amaran', zh: '警报'),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AllWarningsPage(warnings: _allActiveWarnings),
                 ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ProfileTab(
-                        accessToken: widget.accessToken,
-                        username: widget.username,
-                        email: widget.email,
-                        onLogout: _logout,
+              ),
+              icon: Stack(
+                children: [
+                  const Icon(Icons.notifications_none_rounded),
+                  if (_nearbyWarnings.isNotEmpty)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.redAccent,
+                          shape: BoxShape.circle,
+                        ),
                       ),
                     ),
-                  );
-                },
+                ],
               ),
             ),
           ),
