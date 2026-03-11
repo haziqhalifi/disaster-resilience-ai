@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.v1.dependencies import get_current_user
-from app.db.supabase_client import get_client
+from app.db.supabase_client import get_auth_client
 from app.db import users as user_db
 from app.schemas.user import Token, UserOut, UserSignIn, UserSignUp
 
@@ -25,7 +25,7 @@ async def signup(body: UserSignUp) -> Token:
     - **email**: must be a valid, unique email address
     - **password**: minimum 6 characters (managed by Supabase Auth)
     """
-    sb = get_client()
+    sb = get_auth_client()
 
     # Uniqueness checks
     if user_db.get_user_by_email(body.email):
@@ -121,7 +121,7 @@ async def signin(body: UserSignIn) -> Token:
     - **email**: the registered email address
     - **password**: the account password
     """
-    sb = get_client()
+    sb = get_auth_client()
     try:
         sign_in = sb.auth.sign_in_with_password(
             {"email": str(body.email).lower(), "password": body.password}

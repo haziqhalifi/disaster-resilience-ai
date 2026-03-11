@@ -80,9 +80,10 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=4"></script>
-  <script src="js/auth.js?v=4"></script>
+  <script src="js/api.js?v=8"></script>
+  <script src="js/auth.js?v=8"></script>
   <script>
+    // ── Redirect if already signed in ────────────────────────────────────────
     const _tok = localStorage.getItem('admin_token');
     if (_tok) {
       try {
@@ -91,14 +92,15 @@
         else localStorage.removeItem('admin_token');
       } catch(_) { localStorage.removeItem('admin_token'); }
     }
+
+    // ── Show expired session banner immediately (no DOMContentLoaded needed) ─
     if (new URLSearchParams(location.search).get('expired')) {
-      document.addEventListener('DOMContentLoaded', () => {
-        const el = document.getElementById('error-msg');
-        el.textContent = 'Session expired. Please sign in again.';
-        el.classList.remove('hidden');
-      });
+      const el = document.getElementById('error-msg');
+      el.textContent = 'Your session expired. Please sign in again.';
+      el.classList.remove('hidden');
     }
 
+    // ── Tab switching ─────────────────────────────────────────────────────────
     function switchTab(tab) {
       const isLogin = tab === 'login';
       document.getElementById('login-form').classList.toggle('hidden', !isLogin);
@@ -108,48 +110,84 @@
       document.getElementById('error-msg').classList.add('hidden');
     }
 
-    function showError(msg) {
+    // ── Error display ─────────────────────────────────────────────────────────
+    function showError(msg, isWarning = false) {
       const el = document.getElementById('error-msg');
       el.textContent = msg;
-      el.classList.remove('hidden');
+      el.className = isWarning
+        ? 'mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg text-sm'
+        : 'mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm';
     }
 
+    function friendlyError(err, action) {
+      const msg = err.message || '';
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Load failed')) {
+        return 'Cannot reach the server. Make sure the backend is running on port 8000.';
+      }
+      if (msg.includes('503') || msg.toLowerCase().includes('unavailable')) {
+        return 'The database is temporarily unavailable. Please try again in a moment.';
+      }
+      if (action === 'login') {
+        if (msg.includes('401') || msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('credentials')) {
+          return 'Incorrect username or password.';
+        }
+        return msg || 'Sign in failed. Please try again.';
+      }
+      if (action === 'register') {
+        if (msg.includes('409') || msg.toLowerCase().includes('taken') || msg.toLowerCase().includes('already')) {
+          return 'That username is already taken. Choose a different one.';
+        }
+        if (msg.includes('422')) {
+          return 'Username is required and password must be at least 6 characters.';
+        }
+        return msg || 'Registration failed. Please try again.';
+      }
+      return msg || 'Something went wrong. Please try again.';
+    }
+
+    // ── Sign in ───────────────────────────────────────────────────────────────
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = document.getElementById('login-btn');
-      btn.textContent = 'Signing in...'; btn.disabled = true;
+      const origText = btn.textContent;
+      btn.textContent = 'Signing in…'; btn.disabled = true;
       document.getElementById('error-msg').classList.add('hidden');
       try {
         const data = await api.login(
-          document.getElementById('login-username').value,
+          document.getElementById('login-username').value.trim(),
           document.getElementById('login-password').value
         );
         localStorage.setItem('admin_token', data.access_token);
+        btn.textContent = 'Redirecting…';
         window.location.href = 'index.html';
       } catch (err) {
-        showError(err.message || 'Login failed. Check credentials.');
-        btn.textContent = 'Sign In'; btn.disabled = false;
+        showError(friendlyError(err, 'login'));
+        btn.textContent = origText; btn.disabled = false;
       }
     });
 
+    // ── Register ──────────────────────────────────────────────────────────────
     document.getElementById('register-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const password = document.getElementById('reg-password').value;
-      const confirm = document.getElementById('reg-confirm').value;
+      const confirm  = document.getElementById('reg-confirm').value;
+      if (password.length < 6) { showError('Password must be at least 6 characters.'); return; }
       if (password !== confirm) { showError('Passwords do not match.'); return; }
       const btn = document.getElementById('reg-btn');
-      btn.textContent = 'Creating...'; btn.disabled = true;
+      const origText = btn.textContent;
+      btn.textContent = 'Creating account…'; btn.disabled = true;
       document.getElementById('error-msg').classList.add('hidden');
       try {
         const data = await api.register(
-          document.getElementById('reg-username').value,
+          document.getElementById('reg-username').value.trim(),
           password
         );
         localStorage.setItem('admin_token', data.access_token);
+        btn.textContent = 'Redirecting…';
         window.location.href = 'index.html';
       } catch (err) {
-        showError(err.message || 'Registration failed.');
-        btn.textContent = 'Create Account'; btn.disabled = false;
+        showError(friendlyError(err, 'register'));
+        btn.textContent = origText; btn.disabled = false;
       }
     });
   </script>

@@ -153,10 +153,33 @@ class _SubmitReportPageState extends State<SubmitReportPage> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Report submitted successfully'), backgroundColor: Colors.green),
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: Color(0xFF2E7D32), size: 28),
+                SizedBox(width: 10),
+                Text('Report Submitted', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: const Text(
+              'Your report is under review by our team. It will appear on the community feed once approved.',
+              style: TextStyle(color: Colors.black87, height: 1.5),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context); // close dialog
+                  Navigator.pop(context); // go back
+                },
+                child: const Text('OK', style: TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
         );
-        Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {

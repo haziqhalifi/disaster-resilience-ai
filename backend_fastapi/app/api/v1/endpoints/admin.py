@@ -116,6 +116,40 @@ async def get_report(report_id: str, sub: str = Depends(_verify_token)) -> dict:
     return row
 
 
+@router.get("/reports/{report_id}/sms-preview")
+async def sms_preview(report_id: str, sub: str = Depends(_verify_token)) -> dict:
+    """Return count of users who would receive an SMS if this report were approved."""
+    from app.core.geo import haversine
+    from app.db import devices as device_db
+
+    row = report_db.get_report(report_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    lat = row.get("latitude")
+    lon = row.get("longitude")
+    radius_km = 10.0
+    affected = phone_users = 0
+
+    if lat is not None and lon is not None:
+        for dev in device_db.get_all_devices_with_location():
+            if dev["latitude"] is None or dev["longitude"] is None:
+                continue
+            if haversine(dev["latitude"], dev["longitude"], lat, lon) <= radius_km:
+                affected += 1
+                if dev.get("phone_number"):
+                    phone_users += 1
+
+    return {
+        "report_id":      report_id,
+        "location_name":  row.get("location_name", ""),
+        "report_type":    row.get("report_type", ""),
+        "radius_km":      radius_km,
+        "affected_count": affected,
+        "phone_users":    phone_users,
+    }
+
+
 @router.post("/reports/{report_id}/approve")
 async def approve_report(report_id: str, sub: str = Depends(_verify_token)) -> dict:
     row = report_db.get_report(report_id)
@@ -124,14 +158,18 @@ async def approve_report(report_id: str, sub: str = Depends(_verify_token)) -> d
     updated = report_db.validate_report(report_id, validated_by="admin")
 
     broadcast_result: dict = {"total_affected": 0, "push_sent": 0, "sms_sent": 0, "family_leader_sms": 0}
-    if row.get("report_type") == "flood":
-        try:
+    try:
+        if row.get("report_type") == "flood":
             from app.services.notifications import broadcast_flood_report, notify_family_leaders_of_flood
             broadcast_result = await broadcast_flood_report(updated)
             broadcast_result["family_leader_sms"] = await notify_family_leaders_of_flood(updated)
-            logger.info("Auto-SMS broadcast for flood report %s: %s", report_id, broadcast_result)
-        except Exception as exc:
-            logger.error("Auto-SMS failed for report %s: %s", report_id, exc)
+        else:
+            from app.services.notifications import broadcast_report_alert
+            result = await broadcast_report_alert(updated)
+            broadcast_result.update(result)
+        logger.info("Auto-SMS broadcast for report %s (%s): %s", report_id, row.get("report_type"), broadcast_result)
+    except Exception as exc:
+        logger.error("Auto-SMS failed for report %s: %s", report_id, exc)
 
     return {"message": "Report approved", "report": updated, "broadcast": broadcast_result}
 
@@ -212,8 +250,12 @@ async def send_sms_alert(report_id: str, sub: str = Depends(_verify_token)) -> d
         raise HTTPException(status_code=404, detail="Report not found")
     if row.get("status") != "validated":
         raise HTTPException(status_code=400, detail="Report must be validated before sending an SMS alert")
-    from app.services.notifications import broadcast_flood_report
-    result = await broadcast_flood_report(row)
+    if row.get("report_type") == "flood":
+        from app.services.notifications import broadcast_flood_report
+        result = await broadcast_flood_report(row)
+    else:
+        from app.services.notifications import broadcast_report_alert
+        result = await broadcast_report_alert(row)
     logger.info("Admin %s triggered SMS broadcast for report %s: %s", sub, report_id, result)
     return result
 

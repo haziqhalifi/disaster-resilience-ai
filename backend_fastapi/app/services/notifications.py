@@ -156,6 +156,61 @@ async def broadcast_flood_report(report: dict) -> dict:
     return {"total_affected": total, "push_sent": push_sent, "sms_sent": sms_sent}
 
 
+async def broadcast_report_alert(report: dict) -> dict:
+    """Fan-out an approved report of any type to nearby users via Twilio SMS.
+
+    For flood reports, prefer broadcast_flood_report() which also handles
+    shelter info and family-leader notification. This function handles all
+    other disaster types with the generic send_emergency_alert() message.
+    """
+    from app.core.geo import haversine
+    from app.services.twilio_service import send_emergency_alert
+
+    report_lat = report.get("latitude")
+    report_lon = report.get("longitude")
+    if report_lat is None or report_lon is None:
+        logger.warning("Skipping broadcast for report %s — no coordinates", report["id"])
+        return {"total_affected": 0, "push_sent": 0, "sms_sent": 0}
+
+    radius_km   = 10.0
+    event_id    = report["id"]
+    report_type = report.get("report_type", "unknown")
+    location    = report.get("location_name", "nearby area")
+
+    push_sent = sms_sent = total = 0
+
+    for device in device_db.get_all_devices_with_location():
+        if device["latitude"] is None or device["longitude"] is None:
+            continue
+        dist = haversine(device["latitude"], device["longitude"], report_lat, report_lon)
+        if dist > radius_km:
+            continue
+
+        total += 1
+
+        if device.get("fcm_token"):
+            title = "EMERGENCY ALERT"
+            body  = f"{report_type.replace('_', ' ').title()} reported at {location} ({dist:.1f} km from you)."
+            if _send_push(device["fcm_token"], title, body, {"report_id": event_id}):
+                push_sent += 1
+        elif device.get("phone_number"):
+            sent = send_emergency_alert(
+                phone_number=device["phone_number"],
+                user_id=device["user_id"],
+                report_type=report_type,
+                location_name=location,
+                distance_km=dist,
+                event_id=event_id,
+            )
+            if sent:
+                sms_sent += 1
+        else:
+            logger.warning("User %s near incident but has no notification channel", device["user_id"])
+
+    logger.info("Report %s (%s) broadcast: %d affected, %d push, %d SMS", event_id, report_type, total, push_sent, sms_sent)
+    return {"total_affected": total, "push_sent": push_sent, "sms_sent": sms_sent}
+
+
 async def notify_family_leaders_of_flood(report: dict) -> int:
     """Send SMS to family group leaders whose registered location is within 10km of a validated flood."""
     from app.core.geo import haversine

@@ -292,12 +292,26 @@ function printAiReport() {
 
 /* ── Actions ── */
 async function approveReport(id) {
-  showConfirm('Approve this report? For flood reports, SMS alerts will automatically be sent to nearby people.', async () => {
+  const token = getToken();
+  const preview = await api.smsPreview(token, id);
+  const phoneUsers = preview?.phone_users ?? 0;
+  const location   = preview?.location_name ?? 'this area';
+  const confirmMsg = phoneUsers > 0
+    ? `Approve this report?\n\n${phoneUsers} user(s) near ${location} will receive an emergency SMS.`
+    : 'Approve this report? No phone-registered users are nearby — no SMS will be sent.';
+  const btnLabel = phoneUsers > 0 ? 'Approve & Send SMS' : 'Approve';
+
+  const okBtn = document.getElementById('confirm-ok-btn');
+  const origLabel = okBtn.textContent;
+  okBtn.textContent = btnLabel;
+
+  showConfirm(confirmMsg, async () => {
+    okBtn.textContent = origLabel;
     try {
-      const result = await api.approveReport(getToken(), id);
+      const result = await api.approveReport(token, id);
       const b = result.broadcast || {};
-      const msg = (b.total_affected > 0 || b.family_leader_sms > 0)
-        ? `Approved — ${b.sms_sent ?? 0} SMS sent to ${b.total_affected ?? 0} people, ${b.family_leader_sms ?? 0} family leader(s) notified.`
+      const msg = (b.sms_sent > 0)
+        ? `Approved — ${b.sms_sent} SMS sent to ${b.total_affected} people nearby.`
         : 'Report approved successfully.';
       showToast(msg, 'success');
       loadReports(); loadStats();
@@ -447,6 +461,7 @@ document.getElementById('search-input').addEventListener('input', () => {
 document.getElementById('status-filter').addEventListener('change', () => { currentOffset = 0; loadReports(); });
 document.getElementById('type-filter').addEventListener('change',  () => { currentOffset = 0; loadReports(); });
 
-/* ── Initial load ── */
+/* ── Initial load — default to pending so admins see what needs action ── */
 loadStats();
+document.getElementById('status-filter').value = 'pending';
 loadReports();

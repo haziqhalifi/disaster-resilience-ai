@@ -16,17 +16,11 @@ class ReportsTab extends StatefulWidget {
 }
 
 class _ReportsTabState extends State<ReportsTab> {
-  static const _filters = ['All', 'flood', 'blocked_road', 'landslide', 'medical_emergency'];
-  static const _filterLabels = ['All', 'Flood', 'Road Block', 'Landslide', 'Medical'];
-  static const _statusFilters = ['All', 'Verified', 'Pending', 'Most Vouched'];
-
   final ApiService _api = ApiService();
   final WeatherService _weather = WeatherService();
   List<Report> _reports = [];
   bool _loading = true;
   String? _error;
-  String _activeFilter = 'All';
-  String _statusFilter = 'All';
   double _userLat = 3.8077;
   double _userLon = 103.3260;
   double _currentLat = 3.8077;
@@ -71,25 +65,6 @@ class _ReportsTabState extends State<ReportsTab> {
     if (mounted) _fetchReports();
   }
 
-  Future<void> _vouchReport(Report report) async {
-    try {
-      if (report.currentUserVouched) {
-        await _api.unvouchReport(widget.accessToken, report.id);
-      } else {
-        await _api.vouchReport(widget.accessToken, report.id);
-      }
-      _fetchReports();
-    } catch (e) {
-      final msg = e.toString().replaceFirst('Exception: ', '');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(msg.contains('Already vouched') ? 'You already vouched for this report' : msg),
-          backgroundColor: Colors.orange,
-        ));
-      }
-    }
-  }
-
   Future<void> _fetchReports() async {
     if (!mounted) return;
     setState(() {
@@ -102,6 +77,7 @@ class _ReportsTabState extends State<ReportsTab> {
         latitude: _userLat,
         longitude: _userLon,
         radiusKm: 50,
+        statusFilter: 'validated',
       );
       final list = ReportList.fromJson(data);
       if (mounted) {
@@ -120,24 +96,8 @@ class _ReportsTabState extends State<ReportsTab> {
     }
   }
 
-  List<Report> get _filtered {
-    var visible = _reports.where((r) => r.status != 'rejected').toList();
-    if (_activeFilter != 'All') {
-      visible = visible.where((r) => r.reportType == _activeFilter).toList();
-    }
-    if (_statusFilter == 'Verified') {
-      visible = visible.where((r) => r.status == 'validated').toList();
-    } else if (_statusFilter == 'Pending') {
-      visible = visible.where((r) => r.status == 'pending').toList();
-    } else if (_statusFilter == 'Most Vouched') {
-      visible.sort((a, b) => b.vouchCount.compareTo(a.vouchCount));
-    }
-    return visible;
-  }
-
-  // Stats computed from live data
-  int get _activeCount => _reports.where((r) => r.status == 'validated').length;
-  int get _criticalCount => _reports.where((r) => r.vouchCount >= 5).length;
+  // Stats computed from live validated data
+  int get _activeCount => _reports.length;
   int get _resolvedCount => _reports.where((r) => r.status == 'resolved').length;
 
   @override
@@ -261,145 +221,19 @@ class _ReportsTabState extends State<ReportsTab> {
               // Stats row
               Row(
                 children: [
-                  _buildStatCard('$_activeCount', 'Active\nReports', Colors.orange[700]!, Colors.orange[50]!),
+                  _buildStatCard('$_activeCount', 'Verified\nReports', const Color(0xFF2E7D32), const Color(0xFFE8F5E9)),
                   const SizedBox(width: 12),
-                  _buildStatCard('$_criticalCount', 'Critical\nAlerts', Colors.red[700]!, Colors.red[50]!),
-                  const SizedBox(width: 12),
-                  _buildStatCard('$_resolvedCount', 'Resolved\nToday', const Color(0xFF2E7D32), const Color(0xFFE8F5E9)),
+                  _buildStatCard('$_resolvedCount', 'Resolved\nToday', Colors.grey[600]!, Colors.grey[100]!),
                 ],
               ),
               const SizedBox(height: 24),
-
-              // Type filter chips
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: List.generate(_filters.length, (i) {
-                    final isActive = _activeFilter == _filters[i];
-                    final chipColor = i == 0
-                        ? const Color(0xFF2E7D32)
-                        : _colorFor(_filters[i]);
-                    final chipIcon = i == 0
-                        ? Icons.grid_view_rounded
-                        : _iconFor(_filters[i]);
-                    return Padding(
-                      padding: EdgeInsets.only(right: i < _filters.length - 1 ? 8 : 0),
-                      child: GestureDetector(
-                        onTap: () => setState(() => _activeFilter = _filters[i]),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isActive ? chipColor : Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: isActive ? chipColor : Colors.grey[300]!,
-                              width: isActive ? 1.5 : 1,
-                            ),
-                            boxShadow: isActive
-                                ? [BoxShadow(color: chipColor.withValues(alpha: 0.25), blurRadius: 6, offset: const Offset(0, 2))]
-                                : [],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                chipIcon,
-                                size: 14,
-                                color: isActive ? Colors.white : Colors.grey[500],
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                _filterLabels[i],
-                                style: TextStyle(
-                                  color: isActive ? Colors.white : Colors.grey[700],
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                ),
-              ),
-              const SizedBox(height: 14),
-
-              // Status segmented control
-              Container(
-                height: 38,
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[200]!),
-                ),
-                child: Row(
-                  children: _statusFilters.asMap().entries.map((entry) {
-                    final i = entry.key;
-                    final f = entry.value;
-                    final isActive = _statusFilter == f;
-                    final segColor = f == 'Verified'
-                        ? const Color(0xFF2E7D32)
-                        : f == 'Pending'
-                            ? Colors.orange[700]!
-                            : f == 'Most Vouched'
-                                ? Colors.blue[700]!
-                                : const Color(0xFF475569);
-                    final segIcon = f == 'Verified'
-                        ? Icons.verified_rounded
-                        : f == 'Pending'
-                            ? Icons.hourglass_top_rounded
-                            : f == 'Most Vouched'
-                                ? Icons.thumb_up_rounded
-                                : Icons.list_rounded;
-                    return Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _statusFilter = f),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          margin: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            color: isActive ? Colors.white : Colors.transparent,
-                            borderRadius: BorderRadius.circular(9),
-                            boxShadow: isActive
-                                ? [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4, offset: const Offset(0, 1))]
-                                : [],
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                segIcon,
-                                size: 13,
-                                color: isActive ? segColor : Colors.grey[400],
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                f == 'Most Vouched' ? 'Top' : f,
-                                style: TextStyle(
-                                  color: isActive ? segColor : Colors.grey[500],
-                                  fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-              const SizedBox(height: 16),
 
               // Results count
               if (!_loading && _error == null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Text(
-                    '${_filtered.length} report${_filtered.length == 1 ? '' : 's'} found',
+                    '${_reports.length} verified report${_reports.length == 1 ? '' : 's'} near you',
                     style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.w500),
                   ),
                 ),
@@ -646,7 +480,7 @@ class _ReportsTabState extends State<ReportsTab> {
       );
     }
 
-    final visible = _filtered;
+    final visible = _reports;
 
     if (visible.isEmpty) {
       return Center(
@@ -724,7 +558,6 @@ class _ReportsTabState extends State<ReportsTab> {
                         ),
                       ),
                     ),
-                    _buildSeverityBadge(report.severityLabel),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -747,43 +580,6 @@ class _ReportsTabState extends State<ReportsTab> {
                       Text(
                         '${report.distanceKm!.toStringAsFixed(1)} km',
                         style: TextStyle(color: Colors.grey[400], fontSize: 11),
-                      ),
-                    ],
-                    if (report.status != 'validated') ...[
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () => _vouchReport(report),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: report.currentUserVouched ? Colors.blue[50] : Colors.grey[100],
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: report.currentUserVouched ? Colors.blue[300]! : Colors.grey[300]!,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                report.currentUserVouched ? Icons.thumb_up : Icons.thumb_up_outlined,
-                                size: 13,
-                                color: report.currentUserVouched ? Colors.blue[700] : Colors.grey[500],
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                report.vouchCount > 0
-                                    ? '${report.vouchCount} vouch${report.vouchCount == 1 ? '' : 'es'}'
-                                    : 'Vouch',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: report.currentUserVouched ? Colors.blue[700] : Colors.grey[500],
-                                  fontWeight: report.currentUserVouched ? FontWeight.bold : FontWeight.normal,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
                     ],
                     if (report.vulnerablePerson) ...[
@@ -823,25 +619,6 @@ class _ReportsTabState extends State<ReportsTab> {
           style: TextStyle(color: config.$2, fontSize: 10, fontWeight: FontWeight.w600),
         ),
       ],
-    );
-  }
-
-  Widget _buildSeverityBadge(String label) {
-    final color = label == 'HIGH'
-        ? Colors.red
-        : label == 'MEDIUM'
-            ? Colors.orange
-            : Colors.green;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 10),
-      ),
     );
   }
 

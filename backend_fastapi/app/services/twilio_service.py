@@ -14,6 +14,20 @@ logger = logging.getLogger(__name__)
 _MOCK_MODE = not (TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_PHONE_NUMBER)
 
 
+def _print_sms_preview(alert_type: str, to_number: str, body: str) -> None:
+    """Print a clearly formatted SMS preview to stdout for demo/logging purposes."""
+    border = "=" * 62
+    print(f"\n{border}", flush=True)
+    print(f"  LANDA  |  Twilio SMS  |  {alert_type}", flush=True)
+    print(f"  To   : {to_number}", flush=True)
+    print(f"  From : {TWILIO_PHONE_NUMBER or '(mock)'}", flush=True)
+    print(f"  Mode : {'LIVE' if not _MOCK_MODE else 'MOCK'}", flush=True)
+    print(f"{'─' * 62}", flush=True)
+    for line in body.split("\n"):
+        print(f"  {line}", flush=True)
+    print(f"{border}\n", flush=True)
+
+
 def _get_client():
     if _MOCK_MODE:
         return None
@@ -59,6 +73,8 @@ def send_flood_alert(
         f"Stay away from floodwater. Move to higher ground now."
     )
 
+    _print_sms_preview("FLOOD ALERT", phone_number, message)
+
     success = False
     error_reason = None
 
@@ -78,6 +94,69 @@ def send_flood_alert(
     _log_alert(
         user_id=user_id, phone_number=phone_number,
         event_id=event_id, message_body=message,
+        status="sent" if success else "failed",
+        error_reason=error_reason,
+    )
+    return success
+
+
+_TYPE_LABELS: dict[str, str] = {
+    "flood":             "Flood",
+    "landslide":         "Landslide",
+    "blocked_road":      "Blocked Road",
+    "medical_emergency": "Medical Emergency",
+}
+
+
+def send_emergency_alert(
+    *,
+    phone_number: str,
+    user_id: str,
+    report_type: str,
+    location_name: str,
+    distance_km: float,
+    event_id: str,
+) -> bool:
+    """Send a generic emergency alert SMS for any disaster report type."""
+    if not phone_number:
+        return False
+
+    if _already_sent(user_id=user_id, event_id=event_id):
+        logger.info("Dedup: already sent emergency alert to user %s for event %s", user_id, event_id)
+        return False
+
+    type_label = _TYPE_LABELS.get(report_type, report_type.replace("_", " ").title())
+
+    message = (
+        f"EMERGENCY ALERT — LANDA App\n\n"
+        f"{type_label} reported at {location_name} "
+        f"({distance_km:.1f}km from you).\n\n"
+        f"Stay safe. Follow local authority instructions.\n\n"
+        f"Reply:\nSAFE — I am safe\nDANGER — I need rescue"
+    )
+
+    _print_sms_preview(f"EMERGENCY — {type_label}", phone_number, message)
+
+    success = False
+    error_reason = None
+
+    if _MOCK_MODE:
+        logger.info("[MOCK] Emergency SMS (%s) to %s: %s", type_label, phone_number, message[:100])
+        success = True
+    else:
+        try:
+            client = _get_client()
+            client.messages.create(to=phone_number, from_=TWILIO_PHONE_NUMBER, body=message)
+            success = True
+            logger.info("Emergency SMS (%s) sent to %s for event %s", type_label, phone_number, event_id)
+        except Exception as exc:
+            error_reason = str(exc)
+            logger.error("Emergency SMS failed to %s: %s", phone_number, exc)
+
+    _log_alert(
+        user_id=user_id, phone_number=phone_number,
+        event_id=event_id, message_body=message,
+        alert_type=report_type,
         status="sent" if success else "failed",
         error_reason=error_reason,
     )

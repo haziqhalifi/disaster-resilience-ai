@@ -104,8 +104,8 @@ async def upload_report_media(
     if content_type not in allowed_types:
         raise HTTPException(status_code=422, detail="Only JPEG, PNG, WebP, or GIF images allowed")
 
-    from app.db.supabase_client import get_client
-    sb = get_client()
+    from app.db.supabase_client import get_storage_client
+    sb = get_storage_client()
     ext = (file.filename or "photo.jpg").rsplit(".", 1)[-1].lower()
     path = f"{report_id}/{uuid_module.uuid4()}.{ext}"
     content = await file.read()

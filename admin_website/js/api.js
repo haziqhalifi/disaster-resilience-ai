@@ -47,6 +47,15 @@ const api = {
     return res.json();
   },
 
+  async smsPreview(token, id) {
+    const res = await fetch(`${API_BASE}/api/v1/admin/reports/${id}/sms-preview`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 401) { logout(); return null; }
+    if (!res.ok) return null;
+    return res.json();
+  },
+
   async approveReport(token, id) {
     const res = await fetch(`${API_BASE}/api/v1/admin/reports/${id}/approve`, {
       method: 'POST',
