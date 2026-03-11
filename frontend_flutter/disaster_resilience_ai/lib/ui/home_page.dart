@@ -9,7 +9,6 @@ import 'package:disaster_resilience_ai/services/api_service.dart';
 import 'package:disaster_resilience_ai/services/weather_service.dart';
 import 'package:disaster_resilience_ai/ui/auth_page.dart';
 import 'package:disaster_resilience_ai/ui/emergency_alert_page.dart';
-import 'package:disaster_resilience_ai/ui/school_preparedness_page.dart';
 import 'package:disaster_resilience_ai/ui/emergency_contacts_page.dart';
 import 'package:disaster_resilience_ai/ui/reports_tab.dart';
 import 'package:disaster_resilience_ai/ui/map_tab.dart';

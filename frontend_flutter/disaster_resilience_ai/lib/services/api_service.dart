@@ -464,6 +464,16 @@ class ApiService {
   }) async {
     final response = await _postWithNetworkHandling(
       Uri.parse('$baseUrl/api/v1/sirens/'),
+  // ── AI-Driven Learning / Quiz ─────────────────────────────────────────
+
+  /// Generate an adaptive quiz for a hazard type.
+  Future<Map<String, dynamic>> generateQuiz({
+    required String accessToken,
+    required String hazardType,
+    int numQuestions = 5,
+  }) async {
+    final response = await _postWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/learn/quiz/generate'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $accessToken',
@@ -478,6 +488,9 @@ class ApiService {
       },
     );
     if (response.statusCode == 201) {
+      body: {'hazard_type': hazardType, 'num_questions': numQuestions},
+    );
+    if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
     throw Exception(_extractErrorMessage(response));
@@ -490,11 +503,20 @@ class ApiService {
   }) async {
     final response = await _client.post(
       Uri.parse('$baseUrl/api/v1/sirens/$sirenId/trigger'),
+  /// Submit quiz answers and get graded results + recommendations.
+  Future<Map<String, dynamic>> submitQuiz({
+    required String accessToken,
+    required String hazardType,
+    required List<Map<String, String>> answers,
+  }) async {
+    final response = await _postWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/learn/quiz/submit'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $accessToken',
       },
       body: jsonEncode({if (warningId != null) 'warning_id': warningId}),
+      body: {'hazard_type': hazardType, 'answers': answers},
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -531,5 +553,20 @@ class ApiService {
     if (response.statusCode != 200) {
       throw Exception('Failed to update siren status (${response.statusCode})');
     }
+    throw Exception(_extractErrorMessage(response));
+  }
+
+  /// Get learning progress across all hazard types.
+  Future<Map<String, dynamic>> fetchLearningProgress({
+    required String accessToken,
+  }) async {
+    final response = await _getWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/learn/progress'),
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
   }
 }

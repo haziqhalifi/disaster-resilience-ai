@@ -127,10 +127,22 @@ async def signin(body: UserSignIn) -> Token:
             {"email": str(body.email).lower(), "password": body.password}
         )
     except Exception as exc:
+        msg = str(exc).lower()
+        # Wrong credentials should be surfaced as 401.
+        if (
+            "invalid login credentials" in msg
+            or "email not confirmed" in msg
+            or "invalid email or password" in msg
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password.",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from exc
+        # Configuration/upstream auth errors should not be masked as credential failures.
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password.",
-            headers={"WWW-Authenticate": "Bearer"},
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Authentication service error. Check Supabase URL/API key configuration.",
         ) from exc
 
     auth_user = sign_in.user
