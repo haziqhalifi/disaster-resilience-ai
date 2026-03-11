@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math' as math;
 
 import 'package:disaster_resilience_ai/models/risk_map_model.dart';
 import 'package:disaster_resilience_ai/services/api_service.dart';
 import 'package:disaster_resilience_ai/ui/learn_module_page.dart';
+import 'package:disaster_resilience_ai/localization/app_language.dart';
 
 /// Catalogue of learning modules keyed by hazard type.
 class _ModuleInfo {
@@ -91,6 +93,16 @@ class _LearnPageState extends State<LearnPage> {
   Position? _userPos;
   List<RiskZone> _nearbyZones = [];
   Set<String> _localHazards = {};
+  Map<String, double> _masteryByHazard = {};
+  double _overallMastery = 0.0;
+  int _totalQuizzes = 0;
+
+  String _tr({required String en, required String ms, String? zh}) {
+    final lang = AppLanguageScope.of(context).language;
+    if (lang == AppLanguage.malay) return ms;
+    if (lang == AppLanguage.chinese) return zh ?? en;
+    return en;
+  }
 
   @override
   void initState() {
@@ -152,17 +164,39 @@ class _LearnPageState extends State<LearnPage> {
           _userPos = pos;
           _nearbyZones = nearby;
           _localHazards = hazards;
-          _loading = false;
         });
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error = e.toString();
-        });
-      }
+    } catch (_) {
+      // Location failed — continue without recommendations
     }
+
+    // Fetch learning progress
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_access_token');
+      if (token != null) {
+        final data = await _api.fetchLearningProgress(accessToken: token);
+        final progress = data['progress'] as List? ?? [];
+        final mastery = <String, double>{};
+        for (final p in progress) {
+          final hp = p as Map<String, dynamic>;
+          mastery[hp['hazard_type'] as String] = (hp['mastery_level'] as num)
+              .toDouble();
+        }
+        if (mounted) {
+          setState(() {
+            _masteryByHazard = mastery;
+            _overallMastery =
+                (data['overall_mastery'] as num?)?.toDouble() ?? 0;
+            _totalQuizzes = (data['total_quizzes'] as num?)?.toInt() ?? 0;
+          });
+        }
+      }
+    } catch (_) {
+      // Progress fetch failed — continue without it
+    }
+
+    if (mounted) setState(() => _loading = false);
   }
 
   double _distanceKm(double lat1, double lon1, double lat2, double lon2) {
@@ -245,7 +279,13 @@ class _LearnPageState extends State<LearnPage> {
                 children: [
                   // Header
                   _buildHeader(isDark, titleColor, subtitleColor),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+                  // AI Learning Progress
+                  if (_totalQuizzes > 0) ...[
+                    _buildProgressCard(isDark, titleColor, subtitleColor),
+                    const SizedBox(height: 24),
+                  ] else
+                    const SizedBox(height: 8),
                   // Recommended for your area
                   if (_recommendedModules.isNotEmpty) ...[
                     _buildSectionTitle(
@@ -520,6 +560,38 @@ class _LearnPageState extends State<LearnPage> {
                         )
                         .toList(),
                   ),
+                  // Mastery indicator
+                  if (_masteryByHazard.containsKey(mod.hazardType)) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: LinearProgressIndicator(
+                              value: _masteryByHazard[mod.hazardType]!,
+                              backgroundColor: isDark
+                                  ? const Color(0xFF263226)
+                                  : const Color(0xFFE5E7EB),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                mod.color,
+                              ),
+                              minHeight: 4,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${(_masteryByHazard[mod.hazardType]! * 100).toStringAsFixed(0)}%',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: mod.color,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -527,6 +599,111 @@ class _LearnPageState extends State<LearnPage> {
             Icon(Icons.chevron_right, color: subtitleColor, size: 22),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildProgressCard(
+    bool isDark,
+    Color titleColor,
+    Color subtitleColor,
+  ) {
+    final cardBg = isDark ? const Color(0xFF1B251B) : Colors.white;
+    final completedModules = _masteryByHazard.values
+        .where((m) => m >= 0.8)
+        .length;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF2E7D32).withAlpha(40)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.auto_awesome,
+                size: 18,
+                color: const Color(0xFF2E7D32),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _tr(
+                  en: 'AI Learning Progress',
+                  ms: 'Kemajuan Pembelajaran AI',
+                  zh: 'AI学习进度',
+                ),
+                style: TextStyle(
+                  color: titleColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _tr(en: 'Overall Mastery', ms: 'Penguasaan', zh: '总掌握度'),
+                      style: TextStyle(color: subtitleColor, fontSize: 11),
+                    ),
+                    const SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: _overallMastery,
+                        backgroundColor: isDark
+                            ? const Color(0xFF263226)
+                            : const Color(0xFFE5E7EB),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Color(0xFF2E7D32),
+                        ),
+                        minHeight: 8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Column(
+                children: [
+                  Text(
+                    '${(_overallMastery * 100).toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      color: const Color(0xFF2E7D32),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                    ),
+                  ),
+                  Text(
+                    '$_totalQuizzes ${_tr(en: 'quizzes', ms: 'kuiz', zh: '测验')}',
+                    style: TextStyle(color: subtitleColor, fontSize: 10),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          if (completedModules > 0) ...[
+            const SizedBox(height: 8),
+            Text(
+              '$completedModules / ${_allModules.length} ${_tr(en: 'modules mastered', ms: 'modul dikuasai', zh: '模块已掌握')}',
+              style: TextStyle(
+                color: const Color(0xFF2E7D32),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
