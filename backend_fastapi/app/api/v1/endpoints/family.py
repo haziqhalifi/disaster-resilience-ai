@@ -188,6 +188,74 @@ async def family_checkin(
     )
 
 
+@router.post("/self-checkin")
+async def self_checkin(
+    body: FamilyCheckin,
+    current_user: UserOut = Depends(get_current_user),
+) -> dict:
+    """
+    In-app safety status update for the currently logged-in user.
+
+    Looks up the user's phone number from their registered device, finds the
+    corresponding family_members row, and updates its safety_status.  This
+    mirrors what the SMS reply webhook does, but from inside the Flutter app.
+    """
+    from app.db.devices import get_device
+
+    # Try to find a registered device with a phone number for this user
+    device = get_device(current_user.id)
+    phone_number: str | None = device.get("phone_number") if device else None
+
+    member = None
+    if phone_number:
+        member = family_db.find_member_by_phone(phone_number)
+
+    if not member:
+        # Fallback: caller may pass member_id directly (same as /checkin)
+        if body.member_id:
+            member = family_db.get_family_member(body.member_id)
+        if not member:
+            raise HTTPException(
+                status_code=404,
+                detail="No family member record found for your phone number. "
+                       "Ask your family group leader to add your phone number.",
+            )
+
+    updated = family_db.update_member_status(member["id"], safety_status=body.status.value)
+
+    # Update the most recent outgoing SMS alert for this phone (best effort)
+    if phone_number:
+        try:
+            from app.services.sms_service import record_sms_reply
+            record_sms_reply(phone_number, body.status.value)
+        except Exception:
+            pass
+
+    # Notify family group leader via FCM (best effort)
+    try:
+        group = family_db.get_family_group(member["group_id"])
+        if group:
+            from app.services.notifications import _send_push
+            from app.db.devices import get_device as _gd
+            leader_device = _gd(group["leader_user_id"])
+            if leader_device and leader_device.get("fcm_token"):
+                status_label = body.status.value.replace("needs_help", "DANGER").upper()
+                _send_push(
+                    leader_device["fcm_token"],
+                    "Family Safety Update",
+                    f"{member['name']} confirmed {status_label} via app",
+                    {"type": "family_self_checkin"},
+                )
+    except Exception:
+        pass
+
+    return {
+        "member_id":     member["id"],
+        "safety_status": updated["safety_status"],
+        "last_updated":  updated["last_updated"],
+    }
+
+
 @router.get("/status", response_model=list[FamilyMemberOut])
 async def get_family_status(current_user: UserOut = Depends(get_current_user)) -> list[FamilyMemberOut]:
     groups = family_db.get_groups_by_leader(current_user.id)

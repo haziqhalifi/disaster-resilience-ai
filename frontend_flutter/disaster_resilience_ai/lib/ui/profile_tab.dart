@@ -31,11 +31,81 @@ class _ProfileTabState extends State<ProfileTab> {
   bool _loading = true;
   String? _error;
   bool _notificationsEnabled = true;
+  String? _savedPhone; // phone stored in devices table
 
   @override
   void initState() {
     super.initState();
     _fetchProfile();
+    _fetchSavedPhone();
+  }
+
+  Future<void> _fetchSavedPhone() async {
+    try {
+      final device = await _api.getDevice(widget.accessToken);
+      if (mounted) setState(() => _savedPhone = device['phone_number'] as String?);
+    } catch (_) {}
+  }
+
+  Future<void> _showPhoneDialog() async {
+    final ctrl = TextEditingController(text: _savedPhone ?? '');
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('SMS Alert Number'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text(
+            'Enter your Malaysian mobile number. When a disaster is confirmed near you, the system will send an SMS alert to this number.',
+            style: TextStyle(fontSize: 13, height: 1.5),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: ctrl,
+            autofocus: true,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'Phone number',
+              hintText: '+60175815030',
+              prefixIcon: Icon(Icons.phone_android),
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2D5927), foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (saved == null || saved.isEmpty) return;
+    // Normalise: 0175815030 → +60175815030
+    String phone = saved;
+    if (phone.startsWith('0')) phone = '+60${phone.substring(1)}';
+    if (!phone.startsWith('+')) phone = '+$phone';
+    try {
+      await _api.registerDevice(accessToken: widget.accessToken, phoneNumber: phone);
+      if (mounted) {
+        setState(() => _savedPhone = phone);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('SMS alert number saved: $phone'),
+          backgroundColor: const Color(0xFF2D5927),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    }
   }
 
   Future<void> _selectLanguage() async {
@@ -565,6 +635,14 @@ class _ProfileTabState extends State<ProfileTab> {
               ),
             ),
             const SizedBox(height: 8),
+            _buildSettingItem(
+              tr(en: 'SMS Alert Number', ms: 'Nombor SMS Amaran', zh: '短信警报号码'),
+              icon: Icons.sms_outlined,
+              subtitle: _savedPhone != null && _savedPhone!.isNotEmpty
+                  ? _savedPhone!
+                  : tr(en: 'Not set — tap to add your number', ms: 'Belum ditetapkan — ketik untuk tambah', zh: '未设置 — 点击添加号码'),
+              onTap: _showPhoneDialog,
+            ),
             _buildSettingItem(
               tr(en: 'Language', ms: 'Bahasa', zh: '语言'),
               icon: Icons.translate,

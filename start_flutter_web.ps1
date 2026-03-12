@@ -1,5 +1,11 @@
-# Build and serve the Flutter web app on port 5000
-# Run from anywhere: .\start_flutter_web.ps1
+# Run Flutter web app in Chrome debug mode on port 5000 (kills any existing process first)
+$conn = Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue
+if ($conn) {
+    Write-Host "Freeing port 5000 (PID $($conn.OwningProcess))..."
+    Stop-Process -Id $conn.OwningProcess -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 1
+}
+
 Set-Location "$PSScriptRoot\frontend_flutter\disaster_resilience_ai"
-flutter build web
-python -m http.server 5000 --directory build\web
+Write-Host "Starting Flutter web on http://localhost:5000 ..."
+flutter run -d chrome --web-port 5000

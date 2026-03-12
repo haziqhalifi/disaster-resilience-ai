@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:disaster_resilience_ai/services/api_service.dart';
 import 'package:geolocator/geolocator.dart';
@@ -16,6 +17,7 @@ class _FamilyCheckinPageState extends State<FamilyCheckinPage> {
   List<dynamic> _groups = [];
   String? _error;
   List<dynamic> _nearbyFloods = [];
+  Timer? _refreshTimer;
 
   // Controllers for create/edit
   final _groupNameCtrl = TextEditingController();
@@ -28,10 +30,15 @@ class _FamilyCheckinPageState extends State<FamilyCheckinPage> {
   void initState() {
     super.initState();
     _load();
+    // Auto-refresh every 15 s so SMS replies (SAFE/DANGER) appear without manual pull-to-refresh
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted) _load(silent: true);
+    });
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _groupNameCtrl.dispose();
     _memberNameCtrl.dispose();
     _memberPhoneCtrl.dispose();
@@ -39,13 +46,13 @@ class _FamilyCheckinPageState extends State<FamilyCheckinPage> {
     super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) setState(() { _loading = true; _error = null; });
     try {
       final groups = await _api.fetchFamilyGroups(widget.accessToken);
       if (mounted) setState(() { _groups = groups; _loading = false; });
     } catch (e) {
-      if (mounted) setState(() {
+      if (mounted && !silent) setState(() {
         _error = e.toString().replaceFirst('Exception: ', '');
         _loading = false;
       });

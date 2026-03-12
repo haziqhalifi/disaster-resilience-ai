@@ -3,6 +3,7 @@ let currentOffset = 0;
 const PAGE_SIZE   = 50;
 let currentTotal  = 0;
 const _cache      = {}; // report id → full report object
+const _smsCache   = {}; // report id → sms reply stats (lazy loaded)
 
 /* ── Toast ── */
 function showToast(msg, type = 'success') {
@@ -143,6 +144,17 @@ function renderReports(reports) {
       `<button class="btn-a btn-del" onclick="deleteReport('${r.id}')">Delete</button>`,
     ].filter(Boolean).join('');
 
+    // SMS reply pill — shown on validated/resolved reports; lazy loaded
+    let smsPill = '';
+    if (r.status === 'validated' || r.status === 'resolved') {
+      const cached = _smsCache[r.id];
+      if (cached) {
+        smsPill = _renderSmsPill(r.id, cached);
+      } else {
+        smsPill = `<span id="sms-pill-${r.id}" class="rpt-xs" style="cursor:pointer;color:#2563eb" onclick="loadSmsPill('${r.id}')">Load replies</span>`;
+      }
+    }
+
     return `<tr class="rpt-row">
       <td class="px-4 py-3"><span class="tbadge tbadge-${r.report_type}">${tLabel}</span>${vuln}</td>
       <td class="px-4 py-3" style="max-width:140px">
@@ -151,7 +163,10 @@ function renderReports(reports) {
       </td>
       <td class="px-4 py-3 rpt-muted" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
         title="${(r.description||'').replace(/"/g,'&quot;')}">${desc}</td>
-      <td class="px-4 py-3"><span class="sbadge sbadge-${r.status}">${r.status}</span></td>
+      <td class="px-4 py-3">
+        <span class="sbadge sbadge-${r.status}">${r.status}</span>
+        ${smsPill ? `<div style="margin-top:4px">${smsPill}</div>` : ''}
+      </td>
       <td class="px-4 py-3 rpt-cell" style="text-align:center;font-weight:600">${r.vouch_count ?? 0}</td>
       <td class="px-4 py-3">${mediaTd}</td>
       <td class="px-4 py-3">${aiTd}</td>
@@ -476,6 +491,73 @@ document.getElementById('search-input').addEventListener('input', () => {
 });
 document.getElementById('status-filter').addEventListener('change', () => { currentOffset = 0; loadReports(); });
 document.getElementById('type-filter').addEventListener('change',  () => { currentOffset = 0; loadReports(); });
+
+/* ── SMS Reply Summary ── */
+function _renderSmsPill(id, data) {
+  if (!data || data.total_sent === 0) return '';
+  const parts = [];
+  if (data.safe_count   > 0) parts.push(`<span style="color:#16a34a;font-weight:700">${data.safe_count} safe</span>`);
+  if (data.danger_count > 0) parts.push(`<span style="color:#dc2626;font-weight:700">${data.danger_count} danger</span>`);
+  if (data.no_reply_count > 0) parts.push(`<span style="color:#9ca3af">${data.no_reply_count} no reply</span>`);
+  if (!parts.length) return '';
+  return `<span style="font-size:.68rem;cursor:pointer;text-decoration:underline;text-decoration-style:dotted"
+    onclick="openSmsRepliesModal('${id}')" title="Click to view all SMS replies">
+    ${parts.join(' · ')}
+  </span>`;
+}
+
+async function loadSmsPill(id) {
+  const el = document.getElementById(`sms-pill-${id}`);
+  if (el) el.textContent = '…';
+  const data = await api.getSmsReplies(getToken(), id);
+  if (!data) { if (el) el.textContent = ''; return; }
+  _smsCache[id] = data;
+  if (el) el.outerHTML = `<div style="margin-top:4px">${_renderSmsPill(id, data)}</div>`;
+}
+
+function openSmsRepliesModal(id) {
+  const data = _smsCache[id];
+  if (!data) return;
+  const r = _cache[id] || {};
+  const tLabel = TYPE_LABELS[r.report_type] || r.report_type || '';
+
+  const rows = (data.replies || []).map(item => {
+    const statusBg    = item.reply_status === 'safe' ? '#dcfce7' : item.reply_status === 'needs_help' ? '#fee2e2' : '#f3f4f6';
+    const statusColor = item.reply_status === 'safe' ? '#166534' : item.reply_status === 'needs_help' ? '#991b1b' : '#6b7280';
+    const statusLabel = item.reply_status === 'safe' ? 'SAFE' : item.reply_status === 'needs_help' ? 'DANGER' : 'No reply';
+    const sentTime  = item.sent_at  ? new Date(item.sent_at).toLocaleString('en-MY')  : '—';
+    const replyTime = item.reply_at ? new Date(item.reply_at).toLocaleString('en-MY') : '—';
+    const ack = item.rescue_acknowledged
+      ? '<span style="font-size:.65rem;background:#dcfce7;color:#166534;padding:1px 6px;border-radius:9999px;margin-left:4px">Dispatched</span>'
+      : '';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(128,128,128,.1)">
+      <div>
+        <p style="font-size:.825rem;font-weight:600;color:inherit">${item.phone_masked}</p>
+        <p style="font-size:.7rem;color:#9ca3af;margin-top:2px">Sent: ${sentTime}</p>
+        ${item.reply_at ? `<p style="font-size:.7rem;color:#9ca3af">Replied: ${replyTime}</p>` : ''}
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:.75rem;font-weight:700;background:${statusBg};color:${statusColor};padding:3px 10px;border-radius:9999px">${statusLabel}</span>
+        ${ack}
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('sms-replies-title').textContent =
+    `SMS Replies — ${tLabel} at ${r.location_name || ''}`;
+  document.getElementById('sms-replies-summary').innerHTML =
+    `<span style="color:#16a34a;font-weight:700">${data.safe_count} safe</span> &nbsp;·&nbsp; ` +
+    `<span style="color:#dc2626;font-weight:700">${data.danger_count} danger</span> &nbsp;·&nbsp; ` +
+    `<span style="color:#9ca3af">${data.no_reply_count} no reply</span> &nbsp;·&nbsp; ` +
+    `<span style="color:inherit">${data.total_sent} total sent</span>`;
+  document.getElementById('sms-replies-list').innerHTML = rows ||
+    '<p style="text-align:center;color:#9ca3af;font-size:.8rem;padding:16px 0">No SMS alerts found for this report.</p>';
+  document.getElementById('sms-replies-modal').style.display = 'flex';
+}
+
+document.getElementById('sms-replies-close').addEventListener('click', () => {
+  document.getElementById('sms-replies-modal').style.display = 'none';
+});
 
 /* ── Initial load — default to pending so admins see what needs action ── */
 loadStats();

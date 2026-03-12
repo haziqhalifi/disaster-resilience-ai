@@ -260,6 +260,17 @@ class ApiService {
     throw Exception('Failed to update location: ${response.statusCode}');
   }
 
+  /// Fetch the current user's stored device record (includes phone_number).
+  Future<Map<String, dynamic>> getDevice(String accessToken) async {
+    final response = await _getWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/devices/me/device'),
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    if (response.statusCode == 404) return {};
+    throw Exception(_extractErrorMessage(response));
+  }
+
   /// Register device for push notifications and/or SMS fallback.
   Future<Map<String, dynamic>> registerDevice({
     required String accessToken,
@@ -750,6 +761,23 @@ class ApiService {
       Uri.parse('$baseUrl/api/v1/family/checkin'),
       headers: {'Authorization': 'Bearer $accessToken'},
       body: {'member_id': memberId, 'status': status},
+    );
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return jsonDecode(response.body);
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
+  /// In-app safety self-checkin — reports the current user's own safety status.
+  /// The backend resolves the user's family_members row by their registered phone.
+  Future<Map<String, dynamic>> selfCheckin({
+    required String accessToken,
+    required String status,
+  }) async {
+    final response = await _postWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/family/self-checkin'),
+      headers: {'Authorization': 'Bearer $accessToken'},
+      body: {'member_id': '', 'status': status},
     );
     if (response.statusCode == 200 || response.statusCode == 201) {
       return jsonDecode(response.body);

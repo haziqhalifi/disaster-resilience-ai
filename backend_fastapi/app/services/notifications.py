@@ -2,7 +2,7 @@
 
 Channels:
   1. Push notification via FCM token   (stub — integrate Firebase Admin SDK)
-  2. SMS via Twilio for flood alerts
+  2. SMS via sms_service (Mocean / Vonage / EasySendSMS — set SMS_PROVIDER in .env)
 """
 
 from __future__ import annotations
@@ -67,7 +67,7 @@ def broadcast_warning(warning: WarningRecord) -> BroadcastResult:
             if _send_push(device["fcm_token"], title, body, data):
                 result.push_sent += 1
         elif device.get("phone_number"):
-            from app.services.twilio_service import send_government_alert
+            from app.services.sms_service import send_government_alert
             sent = send_government_alert(
                 phone_number=device["phone_number"],
                 user_id=device["user_id"],
@@ -123,10 +123,10 @@ def get_warnings_for_location(
 
 
 async def broadcast_flood_report(report: dict) -> dict:
-    """Fan-out a validated flood report to nearby users via FCM and Twilio SMS."""
+    """Fan-out a validated flood report to nearby users via FCM and SMS."""
     from app.core.geo import haversine
     from app.db.preparedness import get_nearest_evacuation_centre
-    from app.services.twilio_service import send_flood_alert
+    from app.services.sms_service import send_flood_alert
 
     report_lat  = report["latitude"]
     report_lon  = report["longitude"]
@@ -186,14 +186,14 @@ async def broadcast_flood_report(report: dict) -> dict:
 
 
 async def broadcast_report_alert(report: dict) -> dict:
-    """Fan-out an approved report of any type to nearby users via Twilio SMS.
+    """Fan-out an approved report of any type to nearby users via SMS.
 
     For flood reports, prefer broadcast_flood_report() which also handles
     shelter info and family-leader notification. This function handles all
     other disaster types with the generic send_emergency_alert() message.
     """
     from app.core.geo import haversine
-    from app.services.twilio_service import send_emergency_alert
+    from app.services.sms_service import send_emergency_alert
 
     report_lat = report.get("latitude")
     report_lon = report.get("longitude")
@@ -244,7 +244,7 @@ async def notify_family_leaders_of_flood(report: dict) -> int:
     """Send SMS to family group leaders whose registered location is within 10km of a validated flood."""
     from app.core.geo import haversine
     from app.db.supabase_client import get_client
-    from app.services.twilio_service import send_flood_alert
+    from app.services.sms_service import send_flood_alert
 
     report_lat = report.get("latitude")
     report_lon = report.get("longitude")

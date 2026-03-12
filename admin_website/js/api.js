@@ -129,6 +129,15 @@ const api = {
     return res.json();
   },
 
+  async getSmsReplies(token, reportId) {
+    const res = await fetch(`${API_BASE}/api/v1/admin/reports/${reportId}/sms-replies`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 401) { logout(); return null; }
+    if (!res.ok) return null;
+    return res.json();
+  },
+
   async acknowledgeRescue(token, alertId) {
     const res = await fetch(`${API_BASE}/api/v1/admin/rescue-requests/${alertId}/acknowledge`, {
       method: 'POST',

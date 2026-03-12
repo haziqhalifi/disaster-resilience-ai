@@ -5,6 +5,7 @@ import 'package:disaster_resilience_ai/services/api_service.dart';
 import 'package:disaster_resilience_ai/services/weather_service.dart';
 import 'package:disaster_resilience_ai/ui/submit_report_page.dart';
 import 'package:disaster_resilience_ai/ui/location_news_page.dart';
+import 'package:disaster_resilience_ai/ui/family_checkin_page.dart';
 
 class ReportsTab extends StatefulWidget {
   const ReportsTab({super.key, required this.accessToken});
@@ -27,6 +28,11 @@ class _ReportsTabState extends State<ReportsTab> {
   double _currentLon = 103.3260;
   String _locationName = 'My Location';
   bool _isCurrentLocation = true;
+
+  // Safety banner — shown when a flood report is within 10km
+  List<dynamic> _nearbyFloodReports = [];
+  String? _myCheckinStatus; // 'safe' | 'needs_help' | null
+  bool _checkinLoading = false;
 
   // ── Theme helpers ──────────────────────────────────────────────────────────
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
@@ -105,6 +111,49 @@ class _ReportsTabState extends State<ReportsTab> {
           _error = e.toString().replaceFirst('Exception: ', '');
           _loading = false;
         });
+      }
+    }
+    _checkNearbyFloods();
+  }
+
+  Future<void> _checkNearbyFloods() async {
+    try {
+      final data = await _api.fetchNearbyReports(
+        accessToken: widget.accessToken,
+        latitude: _currentLat,
+        longitude: _currentLon,
+        radiusKm: 10.0,
+        statusFilter: 'validated',
+      );
+      final all = (data['reports'] as List<dynamic>? ?? []);
+      final floods = all.where((r) => (r as Map)['report_type'] == 'flood').toList();
+      if (mounted) setState(() { _nearbyFloodReports = floods; });
+    } catch (_) {}
+  }
+
+  Future<void> _selfCheckin(String status) async {
+    if (_checkinLoading) return;
+    setState(() { _checkinLoading = true; });
+    try {
+      await _api.selfCheckin(accessToken: widget.accessToken, status: status);
+      if (mounted) {
+        setState(() { _myCheckinStatus = status; _checkinLoading = false; });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(status == 'safe'
+              ? 'Status updated: You are SAFE. Your family has been notified.'
+              : 'Status updated: DANGER reported. Your family and admin have been notified.'),
+          backgroundColor: status == 'safe' ? Colors.green.shade700 : Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() { _checkinLoading = false; });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ));
       }
     }
   }
@@ -256,6 +305,9 @@ class _ReportsTabState extends State<ReportsTab> {
               ],
               const SizedBox(height: 16),
 
+              // ── Safety self-checkin banner (shown when a flood is within 10km) ─
+              if (_nearbyFloodReports.isNotEmpty) _buildSafetyBanner(),
+
               // ── Stats row ───────────────────────────────────────────────
               Row(
                 children: [
@@ -376,6 +428,160 @@ class _ReportsTabState extends State<ReportsTab> {
           ),
         ),
       ),
+    );
+  }
+
+  // ── Safety self-checkin banner ─────────────────────────────────────────────
+
+  Widget _buildSafetyBanner() {
+    final flood = _nearbyFloodReports.first as Map<String, dynamic>;
+    final location = flood['location_name'] as String? ?? 'nearby area';
+    final distKm = flood['distance_km'] as num?;
+    final distText = distKm != null ? ' (${distKm.toStringAsFixed(1)} km)' : '';
+
+    final alreadyChecked = _myCheckinStatus != null;
+    final isSafe = _myCheckinStatus == 'safe';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: alreadyChecked
+            ? (isSafe
+                ? (_isDark ? const Color(0xFF14291A) : Colors.green.shade50)
+                : (_isDark ? const Color(0xFF2A1010) : Colors.red.shade50))
+            : (_isDark ? const Color(0xFF2A1A0A) : Colors.orange.shade50),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: alreadyChecked
+              ? (isSafe ? Colors.green.shade400 : Colors.red.shade400)
+              : Colors.orange.shade400,
+          width: 1.5,
+        ),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(
+            alreadyChecked
+                ? (isSafe ? Icons.check_circle : Icons.warning_rounded)
+                : Icons.water_damage,
+            color: alreadyChecked ? (isSafe ? Colors.green : Colors.red) : Colors.orange,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              alreadyChecked
+                  ? (isSafe ? 'You reported: SAFE' : 'You reported: NEED HELP')
+                  : 'Flood confirmed near $location$distText',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: alreadyChecked
+                    ? (isSafe
+                        ? (_isDark ? Colors.green.shade300 : Colors.green.shade800)
+                        : (_isDark ? Colors.red.shade300 : Colors.red.shade800))
+                    : (_isDark ? Colors.orange.shade300 : Colors.orange.shade900),
+              ),
+            ),
+          ),
+          if (_nearbyFloodReports.length > 1)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade600,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '${_nearbyFloodReports.length}',
+                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            ),
+        ]),
+        if (!alreadyChecked) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Are you safe? Confirm your status — your family and the admin will be notified.',
+            style: TextStyle(
+              fontSize: 12,
+              color: _isDark ? Colors.orange.shade200 : Colors.orange.shade800,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(
+              child: _checkinLoading
+                  ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                  : ElevatedButton.icon(
+                      onPressed: () => _selfCheckin('safe'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.check_circle_outline, size: 16),
+                      label: const Text("I'm SAFE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _checkinLoading
+                  ? const SizedBox.shrink()
+                  : ElevatedButton.icon(
+                      onPressed: () => _selfCheckin('needs_help'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.warning_rounded, size: 16),
+                      label: const Text('I Need Help', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    ),
+            ),
+          ]),
+        ] else ...[
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(
+              child: Text(
+                'Your family has been notified. Tap to update your status.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: _isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: () => setState(() { _myCheckinStatus = null; }),
+              child: Text(
+                'Change',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: _isDark ? Colors.blue.shade300 : Colors.blue.shade700,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => FamilyCheckinPage(accessToken: widget.accessToken),
+              )),
+              child: Text(
+                'View Family',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: _isDark ? Colors.green.shade300 : Colors.green.shade700,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ]),
+        ],
+      ]),
     );
   }
 

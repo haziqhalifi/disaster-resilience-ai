@@ -1,18 +1,25 @@
-"""Twilio SMS webhook endpoint — processes safety status replies."""
+"""SMS webhook endpoint — processes safety status replies from any provider.
+
+Supports inbound webhook formats for:
+  - MoceanAPI   : mocean-from, mocean-text
+  - Vonage      : msisdn, text
+  - EasySendSMS : From, message
+"""
 
 from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Form, Request, Response
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
 from app.db import family as family_db
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-_SAFE_KEYWORDS    = {"safe", "selamat", "ok", "okay"}
-_DANGER_KEYWORDS  = {"danger", "help", "bahaya", "tolong", "sos"}
+_SAFE_KEYWORDS   = {"safe", "selamat", "ok", "okay"}
+_DANGER_KEYWORDS = {"danger", "help", "bahaya", "tolong", "sos"}
 
 
 def _parse_status(body: str) -> str | None:
@@ -25,41 +32,61 @@ def _parse_status(body: str) -> str | None:
     return None
 
 
-def _twiml(message: str) -> Response:
-    xml = f'<?xml version="1.0" encoding="UTF-8"?><Response><Message>{message}</Message></Response>'
-    return Response(content=xml, media_type="application/xml")
-
-
 @router.post("/webhook")
-async def sms_webhook(
-    request: Request,
-    From: str = Form(...),
-    Body: str = Form(...),
-) -> Response:
-    logger.info("SMS reply from %s: %s", From, Body[:60])
+async def sms_webhook(request: Request) -> JSONResponse:
+    """
+    Unified inbound SMS webhook.
+
+    Auto-detects provider by inspecting which field names are present:
+      Mocean      → mocean-from / mocean-text
+      Vonage      → msisdn / text
+      EasySendSMS → From / message
+    """
+    data = dict(await request.form())
+
+    # Auto-detect sender phone and message body across provider formats
+    sender = (
+        data.get("mocean-from")   # Mocean
+        or data.get("msisdn")     # Vonage
+        or data.get("From", "")   # EasySendSMS / Twilio (legacy)
+    )
+    body = (
+        data.get("mocean-text")   # Mocean
+        or data.get("text")       # Vonage
+        or data.get("message")    # EasySendSMS
+        or data.get("Body", "")   # Twilio (legacy)
+    )
+
+    if not sender:
+        logger.warning("SMS webhook: could not determine sender from fields: %s", list(data.keys()))
+        return JSONResponse({"status": "error", "detail": "sender not found"}, status_code=400)
+
+    logger.info("SMS reply from %s: %s", sender, str(body)[:60])
 
     # Find family member by phone number
-    member = family_db.find_member_by_phone(From)
+    member = family_db.find_member_by_phone(sender)
     if not member:
-        logger.warning("Unregistered phone replied: %s", From)
-        return _twiml("Your number is not registered. Download the Resilience AI app to register.")
+        logger.warning("Unregistered phone replied: %s", sender)
+        return JSONResponse({
+            "status": "unregistered",
+            "message": "Your number is not registered. Download the Resilience AI app to register.",
+        })
 
-    new_status = _parse_status(Body)
+    new_status = _parse_status(str(body))
     if new_status is None:
-        return _twiml(
-            "Reply not recognised. Please reply:\n"
-            "SAFE - if you are safe\n"
-            "DANGER - if you need help"
-        )
+        return JSONResponse({
+            "status": "unrecognised",
+            "message": "Reply not recognised. Please reply SAFE or DANGER.",
+        })
 
     # Update family member status in DB
     family_db.update_member_status(member["id"], safety_status=new_status)
-    logger.info("Updated %s (%s) status to %s via SMS", member["name"], From, new_status)
+    logger.info("Updated %s (%s) status to %s via SMS", member["name"], sender, new_status)
 
     # Record reply on the outgoing SMS alert row so admin rescue panel can see it
     try:
-        from app.services.twilio_service import record_sms_reply
-        record_sms_reply(From, new_status)
+        from app.services.sms_service import record_sms_reply
+        record_sms_reply(sender, new_status)
     except Exception as exc:
         logger.warning("record_sms_reply failed: %s", exc)
 
@@ -82,6 +109,7 @@ async def sms_webhook(
         logger.warning("FCM notify failed: %s", exc)
 
     label = "SAFE" if new_status == "safe" else "DANGER - help requested"
-    return _twiml(
-        f"Status updated to {label}. Your family has been notified. Stay safe."
-    )
+    return JSONResponse({
+        "status": "ok",
+        "message": f"Status updated to {label}. Your family has been notified. Stay safe.",
+    })

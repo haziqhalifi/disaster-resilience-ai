@@ -242,6 +242,50 @@ async def ai_analyze_report(report_id: str, sub: str = Depends(_verify_token)) -
 
 # ── SMS alert dispatch ─────────────────────────────────────────────────────────
 
+@router.get("/reports/{report_id}/sms-replies")
+async def sms_reply_stats(report_id: str, sub: str = Depends(_verify_token)) -> dict:
+    """Return per-report SMS reply stats: safe / danger / no-reply counts and per-row detail."""
+    from app.db.supabase_client import get_client
+    sb = get_client()
+    rows = (
+        sb.table("sms_alerts")
+        .select("*")
+        .eq("event_id", report_id)
+        .order("sent_at", desc=True)
+        .execute().data or []
+    )
+
+    def _mask(phone: str) -> str:
+        p = phone or ""
+        if len(p) < 6:
+            return "****"
+        return p[:3] + "****" + p[-3:]
+
+    safe_count     = sum(1 for r in rows if r.get("reply_status") == "safe")
+    danger_count   = sum(1 for r in rows if r.get("reply_status") == "needs_help")
+    no_reply_count = sum(1 for r in rows if not r.get("reply_status"))
+
+    return {
+        "report_id":      report_id,
+        "total_sent":     len(rows),
+        "safe_count":     safe_count,
+        "danger_count":   danger_count,
+        "no_reply_count": no_reply_count,
+        "replies": [
+            {
+                "id":                   r["id"],
+                "phone_masked":         _mask(r.get("phone_number", "")),
+                "reply_status":         r.get("reply_status") or "no_reply",
+                "alert_type":           r.get("alert_type", ""),
+                "sent_at":              r.get("sent_at"),
+                "reply_at":             r.get("reply_at"),
+                "rescue_acknowledged":  r.get("rescue_acknowledged", False),
+            }
+            for r in rows
+        ],
+    }
+
+
 @router.post("/reports/{report_id}/send-sms")
 async def send_sms_alert(report_id: str, sub: str = Depends(_verify_token)) -> dict:
     """Broadcast a flood SMS to all users within 10km of the validated report."""

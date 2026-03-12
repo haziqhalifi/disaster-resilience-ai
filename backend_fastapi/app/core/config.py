@@ -13,11 +13,27 @@ load_dotenv(_env_path)
 SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")
 
-# ── Twilio SMS ────────────────────────────────────────────────────────────────
+# ── Twilio SMS (legacy — kept for fallback) ───────────────────────────────────
 TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "")
 TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
 # Support both TWILIO_PHONE_NUMBER and TWILIO_FROM_NUMBER (legacy)
 TWILIO_PHONE_NUMBER: str = os.getenv("TWILIO_PHONE_NUMBER") or os.getenv("TWILIO_FROM_NUMBER", "")
+
+# ── SMS Provider Switch ───────────────────────────────────────────────────────
+# Set SMS_PROVIDER to: mocean | vonage | easysendsms
+SMS_PROVIDER:         str = os.getenv("SMS_PROVIDER", "mocean")
+
+# MoceanAPI
+MOCEAN_API_KEY:       str = os.getenv("MOCEAN_API_KEY", "")
+MOCEAN_API_SECRET:    str = os.getenv("MOCEAN_API_SECRET", "")
+
+# Vonage
+VONAGE_API_KEY:       str = os.getenv("VONAGE_API_KEY", "")
+VONAGE_API_SECRET:    str = os.getenv("VONAGE_API_SECRET", "")
+
+# EasySendSMS
+EASYSENDSMS_USERNAME: str = os.getenv("EASYSENDSMS_USERNAME", "")
+EASYSENDSMS_PASSWORD: str = os.getenv("EASYSENDSMS_PASSWORD", "")
 
 # ── Anthropic / Claude AI ─────────────────────────────────────────────────────
 ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
