@@ -16,8 +16,10 @@ if (-not (Test-Path $backendDir)) {
 $backendDir = (Resolve-Path $backendDir).Path
 Set-Location $backendDir
 
+# Try .venv first, then venv (common names)
 $venv = Join-Path $backendDir ".venv\Scripts\Activate.ps1"
-if (Test-Path $venv) { & $venv } else { Write-Host "WARNING: .venv not found, using system Python" }
+if (-not (Test-Path $venv)) { $venv = Join-Path $backendDir "venv\Scripts\Activate.ps1" }
+if (Test-Path $venv) { & $venv } else { Write-Host "WARNING: venv not found, using system Python" }
 
 Write-Host "Starting backend on http://localhost:8000 ..."
 Write-Host "  (Running from: $backendDir)"
