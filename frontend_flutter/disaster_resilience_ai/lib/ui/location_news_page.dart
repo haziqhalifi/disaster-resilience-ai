@@ -367,13 +367,13 @@ class _LocationNewsPageState extends State<LocationNewsPage> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(r.typeLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B))),
+                  Text(r.typeLabel ?? 'Report', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B))),
                   Text(r.locationName, style: TextStyle(color: Colors.grey[500], fontSize: 13)),
                 ])),
                 _buildStatusDot(r.status),
               ]),
               const SizedBox(height: 16),
-              Text(r.description, style: TextStyle(color: Colors.grey[700], fontSize: 14, height: 1.5)),
+              Text(r.description ?? '', style: TextStyle(color: Colors.grey[700], fontSize: 14, height: 1.5)),
               const SizedBox(height: 12),
               Row(children: [
                 Icon(Icons.access_time, size: 14, color: Colors.grey[400]),

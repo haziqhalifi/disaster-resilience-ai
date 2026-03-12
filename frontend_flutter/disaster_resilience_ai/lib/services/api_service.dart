@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthResult {
   final String accessToken;
@@ -32,21 +33,28 @@ class AuthResult {
 
 /// Service class for communicating with the FastAPI backend.
 class ApiService {
-  static const Duration _requestTimeout = Duration(seconds: 12);
+  static const Duration _requestTimeout = Duration(seconds: 15);
+  static const int _maxRetries = 3;
+  static const Duration _retryDelay = Duration(milliseconds: 800);
+  static const String _prefsKey = 'api_base_url';
   static const String _baseUrlOverride = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: '',
   );
 
+  /// Runtime override from SharedPreferences (set via [setBaseUrl] or [initFromPrefs]).
+  static String? _storedBaseUrl;
+
   /// Base URL of the FastAPI server.
   ///
-  /// Override with `--dart-define=API_BASE_URL=http://<host>:8000`.
-  /// - Web (Chrome/Edge): uses localhost directly.
-  /// - Android emulator: 10.0.2.2 maps to the host machine's localhost.
-  /// - Desktop/iOS: localhost works when backend runs on same machine.
+  /// Priority: 1) dart-define API_BASE_URL, 2) stored in SharedPreferences,
+  /// 3) platform default (localhost / 10.0.2.2 for Android emulator).
   static String get baseUrl {
     if (_baseUrlOverride.trim().isNotEmpty) {
       return _baseUrlOverride.trim();
+    }
+    if (_storedBaseUrl != null && _storedBaseUrl!.trim().isNotEmpty) {
+      return _storedBaseUrl!.trim();
     }
     if (kIsWeb) {
       return 'http://localhost:8000';
@@ -57,14 +65,49 @@ class ApiService {
     return 'http://localhost:8000';
   }
 
+  /// Load stored API URL from SharedPreferences. Call at app startup.
+  static Future<void> initFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    _storedBaseUrl = prefs.getString(_prefsKey);
+  }
+
+  /// Save API URL and use it for all subsequent requests.
+  /// Use when running on a physical device or when localhost fails.
+  static Future<void> setBaseUrl(String url) async {
+    final trimmed = url.trim();
+    if (trimmed.isEmpty) return;
+    _storedBaseUrl = trimmed;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefsKey, trimmed);
+  }
+
+  /// Clear the stored API URL (revert to platform default).
+  static Future<void> clearStoredBaseUrl() async {
+    _storedBaseUrl = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefsKey);
+  }
+
   final http.Client _client;
 
   ApiService({http.Client? client}) : _client = client ?? http.Client();
 
+  /// Check if backend is reachable. Uses root health endpoint.
+  Future<bool> checkConnection() async {
+    try {
+      final response = await _withRetry(
+        () => _client.get(Uri.parse('$baseUrl/')).timeout(const Duration(seconds: 5)),
+      );
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Ping the alerts service to verify connectivity.
   Future<Map<String, dynamic>> ping() async {
-    final response = await _client.get(
-      Uri.parse('$baseUrl/api/v1/alerts/ping'),
+    final response = await _withRetry(
+      () => _client.get(Uri.parse('$baseUrl/api/v1/alerts/ping')).timeout(_requestTimeout),
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -74,10 +117,9 @@ class ApiService {
 
   /// Request a risk prediction from the backend.
   Future<Map<String, dynamic>> predictRisk(List<double> features) async {
-    final response = await _client.post(
+    final response = await _postWithNetworkHandling(
       Uri.parse('$baseUrl/api/v1/alerts/predict'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'features': features}),
+      body: {'features': features},
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -148,37 +190,61 @@ class ApiService {
     return 'Request failed with status ${response.statusCode}';
   }
 
+  /// Execute a request with retries for transient connection failures.
+  Future<T> _withRetry<T>(Future<T> Function() fn) async {
+    Object? lastError;
+    for (var attempt = 0; attempt < _maxRetries; attempt++) {
+      try {
+        return await fn();
+      } on TimeoutException catch (e) {
+        lastError = e;
+        if (attempt < _maxRetries - 1) {
+          await Future<void>.delayed(_retryDelay);
+        }
+      } on http.ClientException catch (e) {
+        lastError = e;
+        if (attempt < _maxRetries - 1) {
+          await Future<void>.delayed(_retryDelay);
+        }
+      }
+    }
+    throw Exception(_connectivityErrorMessage());
+  }
+
   Future<http.Response> _postWithNetworkHandling(
     Uri uri, {
     required Map<String, dynamic> body,
     Map<String, String>? headers,
   }) async {
-    try {
-      return await _client
-          .post(
-            uri,
-            headers: {'Content-Type': 'application/json', ...?headers},
-            body: jsonEncode(body),
-          )
-          .timeout(_requestTimeout);
-    } on TimeoutException {
-      throw Exception(_connectivityErrorMessage());
-    } on http.ClientException {
-      throw Exception(_connectivityErrorMessage());
-    }
+    return _withRetry(() => _client
+        .post(
+          uri,
+          headers: {'Content-Type': 'application/json', ...?headers},
+          body: jsonEncode(body),
+        )
+        .timeout(_requestTimeout));
   }
 
   Future<http.Response> _getWithNetworkHandling(
     Uri uri, {
     Map<String, String>? headers,
   }) async {
-    try {
-      return await _client.get(uri, headers: headers).timeout(_requestTimeout);
-    } on TimeoutException {
-      throw Exception(_connectivityErrorMessage());
-    } on http.ClientException {
-      throw Exception(_connectivityErrorMessage());
-    }
+    return _withRetry(
+        () => _client.get(uri, headers: headers).timeout(_requestTimeout));
+  }
+
+  Future<http.Response> _putWithNetworkHandling(
+    Uri uri, {
+    required Object body,
+    Map<String, String>? headers,
+  }) async {
+    return _withRetry(() => _client
+        .put(
+          uri,
+          headers: {'Content-Type': 'application/json', ...?headers},
+          body: body is String ? body : jsonEncode(body),
+        )
+        .timeout(_requestTimeout));
   }
 
   Future<http.Response> _patchWithNetworkHandling(
@@ -186,24 +252,18 @@ class ApiService {
     required Map<String, dynamic> body,
     Map<String, String>? headers,
   }) async {
-    try {
-      return await _client
-          .patch(
-            uri,
-            headers: {'Content-Type': 'application/json', ...?headers},
-            body: jsonEncode(body),
-          )
-          .timeout(_requestTimeout);
-    } on TimeoutException {
-      throw Exception(_connectivityErrorMessage());
-    } on http.ClientException {
-      throw Exception(_connectivityErrorMessage());
-    }
+    return _withRetry(() => _client
+        .patch(
+          uri,
+          headers: {'Content-Type': 'application/json', ...?headers},
+          body: jsonEncode(body),
+        )
+        .timeout(_requestTimeout));
   }
 
   String _connectivityErrorMessage() {
-    return 'Cannot reach backend at $baseUrl. Ensure FastAPI is running and '
-        'use --dart-define=API_BASE_URL=http://<your-host>:8000 if needed.';
+    return 'Cannot reach backend at $baseUrl. Tap "Set Server URL" to configure, '
+        'or ensure FastAPI is running (.\start_backend.ps1).';
   }
 
   // ── Hyper-Local Early Warnings ──────────────────────────────────────────
@@ -221,7 +281,7 @@ class ApiService {
         'longitude': longitude.toString(),
       },
     );
-    final response = await _client.get(uri);
+    final response = await _getWithNetworkHandling(uri);
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
@@ -241,7 +301,7 @@ class ApiService {
     final uri = Uri.parse(
       '$baseUrl/api/v1/warnings',
     ).replace(queryParameters: params);
-    final response = await _client.get(uri);
+    final response = await _getWithNetworkHandling(uri);
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
@@ -250,7 +310,7 @@ class ApiService {
 
   /// Get a single warning by ID.
   Future<Map<String, dynamic>> fetchWarning(String warningId) async {
-    final response = await _client.get(
+    final response = await _getWithNetworkHandling(
       Uri.parse('$baseUrl/api/v1/warnings/$warningId'),
     );
     if (response.statusCode == 200) {
@@ -302,14 +362,14 @@ class ApiService {
     required double latitude,
     required double longitude,
   }) async {
-    final response = await _client.put(
+    final response = await _withRetry(() => _client.put(
       Uri.parse('$baseUrl/api/v1/devices/me/location'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $accessToken',
       },
       body: jsonEncode({'latitude': latitude, 'longitude': longitude}),
-    );
+    ).timeout(_requestTimeout));
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
@@ -341,18 +401,15 @@ class ApiService {
       payload['phone_number'] = phoneNumber;
     }
 
-    final response = await _client.put(
+    final response = await _putWithNetworkHandling(
       Uri.parse('$baseUrl/api/v1/devices/me/device'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $accessToken',
-      },
-      body: jsonEncode(payload),
+      headers: {'Authorization': 'Bearer $accessToken'},
+      body: payload,
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
-    throw Exception('Failed to register device: ${response.statusCode}');
+    throw Exception(_extractErrorMessage(response));
   }
 
   // ── AI Risk Mapping ──────────────────────────────────────────────────────
@@ -365,7 +422,7 @@ class ApiService {
     final uri = Uri.parse(
       '$baseUrl/api/v1/risk-map',
     ).replace(queryParameters: params.isNotEmpty ? params : null);
-    final response = await _client.get(uri);
+    final response = await _getWithNetworkHandling(uri);
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
@@ -410,7 +467,7 @@ class ApiService {
 
   /// Fetch the current user's profile information.
   Future<Map<String, dynamic>> fetchProfile(String accessToken) async {
-    final response = await _client.get(
+    final response = await _getWithNetworkHandling(
       Uri.parse('$baseUrl/api/v1/profile/me'),
       headers: {'Authorization': 'Bearer $accessToken'},
     );
@@ -425,13 +482,10 @@ class ApiService {
     required String accessToken,
     required Map<String, dynamic> profileData,
   }) async {
-    final response = await _client.put(
+    final response = await _putWithNetworkHandling(
       Uri.parse('$baseUrl/api/v1/profile/me'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $accessToken',
-      },
-      body: jsonEncode(profileData),
+      headers: {'Authorization': 'Bearer $accessToken'},
+      body: profileData,
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
@@ -534,22 +588,23 @@ class ApiService {
     required String filename,
     required String contentType,
   }) async {
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse('$baseUrl/api/v1/reports/media/upload'),
-    );
-    request.headers['Authorization'] = 'Bearer $accessToken';
-    request.files.add(
-      http.MultipartFile.fromBytes(
-        'file',
-        bytes,
-        filename: filename,
-        contentType: _parseMediaType(contentType),
-      ),
-    );
-
-    final streamed = await request.send().timeout(_requestTimeout);
-    final response = await http.Response.fromStream(streamed);
+    final response = await _withRetry(() async {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/api/v1/reports/media/upload'),
+      );
+      request.headers['Authorization'] = 'Bearer $accessToken';
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: filename,
+          contentType: _parseMediaType(contentType),
+        ),
+      );
+      final streamed = await request.send().timeout(_requestTimeout);
+      return http.Response.fromStream(streamed);
+    });
     if (response.statusCode == 201) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
@@ -638,116 +693,6 @@ class ApiService {
       // Swallow — caller decides how to handle null.
     }
     return null;
-  }
-
-<<<<<<< HEAD
-  // ── Reports ───────────────────────────────────────────────────────────────
-
-  Future<Map<String, dynamic>> fetchNearbyReports({
-    required String accessToken,
-    required double latitude,
-    required double longitude,
-    double radiusKm = 50,
-    String? statusFilter,
-  }) async {
-    final params = <String, String>{
-      'latitude': latitude.toString(),
-      'longitude': longitude.toString(),
-      'radius_km': radiusKm.toString(),
-    };
-    if (statusFilter != null) params['status_filter'] = statusFilter;
-    final uri = Uri.parse('$baseUrl/api/v1/reports/nearby/list').replace(
-      queryParameters: params,
-    );
-    final response = await _getWithNetworkHandling(
-      uri,
-      headers: {'Authorization': 'Bearer $accessToken'},
-    );
-    if (response.statusCode == 200) return jsonDecode(response.body);
-    throw Exception(_extractErrorMessage(response));
-  }
-
-  Future<Map<String, dynamic>> submitReport({
-    required String accessToken,
-    required String reportType,
-    required String description,
-    required double latitude,
-    required double longitude,
-    required String locationName,
-    bool vulnerablePerson = false,
-  }) async {
-    final response = await _postWithNetworkHandling(
-      Uri.parse('$baseUrl/api/v1/reports/submit'),
-      headers: {'Authorization': 'Bearer $accessToken'},
-      body: {
-        'report_type': reportType,
-        'description': description,
-        'latitude': latitude,
-        'longitude': longitude,
-        'location_name': locationName,
-        'vulnerable_person': vulnerablePerson,
-      },
-    );
-    if (response.statusCode == 201) return jsonDecode(response.body);
-    throw Exception(_extractErrorMessage(response));
-  }
-
-  Future<String> uploadReportMedia({
-    required String accessToken,
-    required String reportId,
-    required XFile imageFile,
-    String mimeType = 'image/jpeg',
-  }) async {
-    final uri = Uri.parse('$baseUrl/api/v1/reports/$reportId/upload-media');
-    final bytes = await imageFile.readAsBytes();
-    final filename = imageFile.name.isNotEmpty ? imageFile.name : 'photo.jpg';
-    final request = http.MultipartRequest('POST', uri)
-      ..headers['Authorization'] = 'Bearer $accessToken'
-      ..files.add(http.MultipartFile.fromBytes(
-        'file',
-        bytes,
-        filename: filename,
-        contentType: MediaType.parse(mimeType),
-      ));
-    try {
-      final streamed = await request.send().timeout(_requestTimeout);
-      final resp = await http.Response.fromStream(streamed);
-      if (resp.statusCode == 200) {
-        return (jsonDecode(resp.body) as Map<String, dynamic>)['media_url'] as String;
-      }
-      throw Exception('Media upload failed: ${resp.statusCode}');
-    } on TimeoutException {
-      throw Exception(_connectivityErrorMessage());
-    } on http.ClientException {
-      throw Exception(_connectivityErrorMessage());
-    }
-  }
-
-  Future<void> vouchReport(String accessToken, String reportId) async {
-    final response = await _postWithNetworkHandling(
-      Uri.parse('$baseUrl/api/v1/reports/$reportId/vouch'),
-      headers: {'Authorization': 'Bearer $accessToken'},
-      body: {},
-    );
-    if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception(_extractErrorMessage(response));
-    }
-  }
-
-  Future<void> unvouchReport(String accessToken, String reportId) async {
-    try {
-      final response = await _client.delete(
-        Uri.parse('$baseUrl/api/v1/reports/$reportId/vouch'),
-        headers: {'Authorization': 'Bearer $accessToken'},
-      ).timeout(_requestTimeout);
-      if (response.statusCode != 200 && response.statusCode != 204) {
-        throw Exception(_extractErrorMessage(response));
-      }
-    } on TimeoutException {
-      throw Exception(_connectivityErrorMessage());
-    } on http.ClientException {
-      throw Exception(_connectivityErrorMessage());
-    }
   }
 
   // ── Preparedness ──────────────────────────────────────────────────────────
@@ -946,7 +891,7 @@ class ApiService {
   // ── IoT Sirens ───────────────────────────────────────────────────────────
 
   Future<List<dynamic>> fetchSirens() async {
-    final response = await _client.get(Uri.parse('$baseUrl/api/v1/sirens/'));
+    final response = await _getWithNetworkHandling(Uri.parse('$baseUrl/api/v1/sirens/'));
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as List<dynamic>;
     }

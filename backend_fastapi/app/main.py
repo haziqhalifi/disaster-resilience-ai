@@ -7,17 +7,18 @@ Run with:
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+import httpx
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.endpoints import (
-    admin, alerts, auth, devices, family, preparedness,
+    admin, alerts, auth, devices, family, learn, preparedness,
     profile, reports, risk_map, sirens, sms, warnings,
 )
-from app.api.v1.endpoints import alerts, auth, devices, family, preparedness, profile, reports, risk_map, warnings
-from app.api.v1.endpoints import admin, learn, sms
 from app.scheduler import start_scheduler, stop_scheduler
+
+OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 
 
 @asynccontextmanager
@@ -61,6 +62,27 @@ app.include_router(admin.router,         prefix="/api/v1/admin",          tags=[
 app.include_router(sms.router,           prefix="/api/v1/sms",            tags=["sms"])
 app.include_router(sirens.router,        prefix="/api/v1/sirens",         tags=["sirens"])
 app.include_router(learn.router,         prefix="/api/v1/learn",          tags=["learn"])
+# Weather proxy — registered at app level (no Supabase/DB dependency, always works)
+@app.get("/api/v1/weather/forecast", tags=["weather"])
+async def weather_forecast(
+    latitude: float = Query(..., ge=-90, le=90),
+    longitude: float = Query(..., ge=-180, le=180),
+    timezone: str = Query(default="Asia/Kuala_Lumpur"),
+    forecast_days: int = Query(default=7, ge=1, le=16),
+):
+    """Proxy to Open-Meteo API. No DB/Supabase dependency — always available."""
+    params = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "current": "temperature_2m,weathercode,windspeed_10m,relative_humidity_2m",
+        "daily": "weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum",
+        "timezone": timezone,
+        "forecast_days": forecast_days,
+    }
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.get(OPEN_METEO_URL, params=params)
+        resp.raise_for_status()
+        return resp.json()
 
 
 @app.get("/", tags=["health"])

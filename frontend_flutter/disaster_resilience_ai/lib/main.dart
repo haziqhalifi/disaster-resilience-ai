@@ -1,6 +1,7 @@
 import 'package:disaster_resilience_ai/localization/app_language.dart';
 import 'package:disaster_resilience_ai/l10n/app_localizations.dart';
 import 'package:disaster_resilience_ai/models/warning_model.dart';
+import 'package:disaster_resilience_ai/services/api_service.dart';
 import 'package:disaster_resilience_ai/services/notification_service.dart';
 import 'package:disaster_resilience_ai/theme/app_theme.dart';
 import 'package:disaster_resilience_ai/ui/auth_page.dart';
@@ -14,6 +15,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await ApiService.initFromPrefs();
   await NotificationService.instance.init();
   NotificationService.instance.navigatorKey = navigatorKey;
   NotificationService.instance.onEmergencyAlert = (Warning warning) {

@@ -1119,10 +1119,10 @@ class _ProfileTabState extends State<ProfileTab> {
                 value: _notificationsEnabled,
                 onChanged: (value) =>
                     setState(() => _notificationsEnabled = value),
-                activeTrackColor: switchActiveTrack,
-                activeThumbColor: switchActiveThumb,
-                inactiveTrackColor: switchInactiveTrack,
-                inactiveThumbColor: switchInactiveThumb,
+                thumbColor: WidgetStateProperty.resolveWith((states) =>
+                    states.contains(WidgetState.selected) ? switchActiveThumb : switchInactiveThumb),
+                trackColor: WidgetStateProperty.resolveWith((states) =>
+                    states.contains(WidgetState.selected) ? switchActiveTrack : switchInactiveTrack),
               ),
             ),
             _buildSettingItem(
@@ -1203,10 +1203,10 @@ class _ProfileTabState extends State<ProfileTab> {
                 onChanged: (value) {
                   themeController.setDarkMode(value);
                 },
-                activeTrackColor: switchActiveTrack,
-                activeThumbColor: switchActiveThumb,
-                inactiveTrackColor: switchInactiveTrack,
-                inactiveThumbColor: switchInactiveThumb,
+                thumbColor: WidgetStateProperty.resolveWith((states) =>
+                    states.contains(WidgetState.selected) ? switchActiveThumb : switchInactiveThumb),
+                trackColor: WidgetStateProperty.resolveWith((states) =>
+                    states.contains(WidgetState.selected) ? switchActiveTrack : switchInactiveTrack),
               ),
             ),
             const SizedBox(height: 8),

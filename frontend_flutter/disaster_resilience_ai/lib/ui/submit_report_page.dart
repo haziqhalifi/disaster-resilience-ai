@@ -745,18 +745,14 @@ class _SubmitReportPageState extends State<SubmitReportPage> {
                   Switch(
                     value: _vulnerableHelp,
                     onChanged: (val) => setState(() => _vulnerableHelp = val),
-                    activeThumbColor: isDark
-                        ? const Color(0xFFFEE2E2)
-                        : Colors.white,
-                    activeTrackColor: isDark
-                        ? const Color(0xFFB91C1C)
-                        : Colors.red[400],
-                    inactiveThumbColor: isDark
-                        ? const Color(0xFF94A3B8)
-                        : Colors.white,
-                    inactiveTrackColor: isDark
-                        ? const Color(0xFF475569)
-                        : Colors.grey[300],
+                    thumbColor: WidgetStateProperty.resolveWith((states) =>
+                        states.contains(WidgetState.selected)
+                            ? (isDark ? const Color(0xFFFEE2E2) : Colors.white)
+                            : (isDark ? const Color(0xFF94A3B8) : Colors.white)),
+                    trackColor: WidgetStateProperty.resolveWith((states) =>
+                        states.contains(WidgetState.selected)
+                            ? (isDark ? const Color(0xFFB91C1C) : Colors.red.shade400)
+                            : (isDark ? const Color(0xFF475569) : Colors.grey.shade300)),
                   ),
                 ],
               ),

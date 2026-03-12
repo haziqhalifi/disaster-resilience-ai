@@ -1,19 +1,38 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:disaster_resilience_ai/models/weather_model.dart';
+import 'package:disaster_resilience_ai/services/api_service.dart';
 
 class WeatherService {
-  static const String _baseUrl = 'https://api.open-meteo.com/v1/forecast';
+  static const String _openMeteoUrl = 'https://api.open-meteo.com/v1/forecast';
   static const String _reverseGeoUrl =
       'https://geocoding-api.open-meteo.com/v1/reverse';
   static const String _osmReverseGeoUrl =
       'https://nominatim.openstreetmap.org/reverse';
 
+  /// Uses backend proxy on web (avoids CORS). Direct Open-Meteo on mobile.
   Future<WeatherData> fetchWeather({
     required double latitude,
     required double longitude,
   }) async {
-    final uri = Uri.parse(_baseUrl).replace(
+    if (kIsWeb) {
+      final uri = Uri.parse('${ApiService.baseUrl}/api/v1/weather/forecast')
+          .replace(queryParameters: {
+        'latitude': latitude.toString(),
+        'longitude': longitude.toString(),
+        'timezone': 'Asia/Kuala_Lumpur',
+        'forecast_days': '7',
+      });
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) {
+        throw Exception('Failed to fetch weather (${response.statusCode})');
+      }
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      return WeatherData.fromJson(json);
+    }
+
+    final uri = Uri.parse(_openMeteoUrl).replace(
       queryParameters: {
         'latitude': latitude.toString(),
         'longitude': longitude.toString(),
@@ -25,13 +44,10 @@ class WeatherService {
         'forecast_days': '7',
       },
     );
-
     final response = await http.get(uri).timeout(const Duration(seconds: 10));
-
     if (response.statusCode != 200) {
       throw Exception('Failed to fetch weather (${response.statusCode})');
     }
-
     final json = jsonDecode(response.body) as Map<String, dynamic>;
     return WeatherData.fromJson(json);
   }

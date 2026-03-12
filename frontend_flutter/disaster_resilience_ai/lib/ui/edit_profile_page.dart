@@ -166,7 +166,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 canvasColor: surface,
               ),
               child: DropdownButtonFormField<String>(
-                initialValue: _selectedBloodType,
+                value: _selectedBloodType,
                 dropdownColor: surface,
                 style: TextStyle(color: heading),
                 decoration: _inputDecoration(

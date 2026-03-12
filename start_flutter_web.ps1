@@ -1,8 +1,9 @@
 # Run Flutter web app in Chrome debug mode on port 5000 (kills any existing process first)
 $conn = Get-NetTCPConnection -LocalPort 5000 -State Listen -ErrorAction SilentlyContinue
 if ($conn) {
-    Write-Host "Freeing port 5000 (PID $($conn.OwningProcess))..."
-    Stop-Process -Id $conn.OwningProcess -Force -ErrorAction SilentlyContinue
+    $procId = $conn.OwningProcess
+    Write-Host "Freeing port 5000 (PID $procId)..."
+    Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 1
 }
 
