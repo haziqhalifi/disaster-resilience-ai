@@ -596,8 +596,8 @@ class ApiService {
         'latitude': latitude,
         'longitude': longitude,
         'radius_km': radiusKm,
-        if (endpointUrl != null) 'endpoint_url': endpointUrl,
-        if (apiKey != null) 'api_key': apiKey,
+        'endpoint_url': ?endpointUrl,
+        'api_key': ?apiKey,
       },
     );
     if (response.statusCode == 201) {
@@ -617,7 +617,7 @@ class ApiService {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $accessToken',
       },
-      body: {if (warningId != null) 'warning_id': warningId},
+      body: {'warning_id': ?warningId},
     );
     if (response.statusCode == 200) {
       return jsonDecode(response.body) as Map<String, dynamic>;
