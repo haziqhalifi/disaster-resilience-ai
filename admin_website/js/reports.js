@@ -105,15 +105,24 @@ function renderReports(reports) {
       ? `<span class="rpt-xs">${Number(r.latitude).toFixed(4)}, ${Number(r.longitude).toFixed(4)}</span>`
       : '';
 
-    // Media thumbnail — click to open full viewer modal
+    // Media thumbnails — click to open full viewer modal
+    // Backend returns media_urls (array); show up to 3 thumbnails
     let mediaTd = '<span class="rpt-xs" style="padding:0">—</span>';
-    if (r.media_url) {
-      const safeUrl = r.media_url.replace(/'/g, "\\'");
-      mediaTd = `<img src="${r.media_url}" loading="lazy"
-        class="w-14 h-14 object-cover rounded-lg cursor-pointer hover:opacity-75 transition-opacity"
-        style="ring:1px solid #e2e8f0"
-        onclick="openMediaModal('${safeUrl}')"
-        title="Click to view media" />`;
+    const mediaList = r.media_urls && r.media_urls.length > 0 ? r.media_urls
+                    : (r.media_url ? [r.media_url] : []);
+    if (mediaList.length > 0) {
+      const thumbs = mediaList.slice(0, 3).map(url => {
+        // Resolve relative paths against the API base URL
+        const src = url.startsWith('http') ? url : (API_BASE + url);
+        const safeSrc = src.replace(/'/g, "\\'");
+        return `<img src="${src}" loading="lazy"
+          class="w-12 h-12 object-cover rounded-lg cursor-pointer hover:opacity-75 transition-opacity inline-block mr-1"
+          onclick="openMediaModal('${safeSrc}')"
+          onerror="this.style.display='none'"
+          title="Click to view media" />`;
+      }).join('');
+      const extra = mediaList.length > 3 ? `<span class="rpt-xs" style="vertical-align:top">+${mediaList.length - 3}</span>` : '';
+      mediaTd = thumbs + extra;
     }
 
     // AI score — AI Check button ONLY for pending (unverified) reports

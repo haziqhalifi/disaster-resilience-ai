@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Resilience AI — Admin</title>
-  <link rel="icon" href="logo.png" />
+  <link rel="icon" href="logo.png" type="image/png" />
   <!-- Apply dark class before page renders to avoid flash -->
   <script>
     if (localStorage.getItem('adminDark') === '1' ||
@@ -31,10 +31,6 @@
       --modal:         #ffffff;
       --modal-border:  #e2e8f0;
       --overlay:       rgba(255,255,255,0.65);
-      --rescue-bg:     #fff1f2;
-      --rescue-border: #fecdd3;
-      --rescue-head:   #fef2f2;
-      --rescue-title:  #991b1b;
     }
     .dark {
       --bg:            #0F140F;
@@ -52,10 +48,6 @@
       --modal:         #1B251B;
       --modal-border:  #243324;
       --overlay:       rgba(27,37,27,0.72);
-      --rescue-bg:     #2d0a0a;
-      --rescue-border: #7f1d1d;
-      --rescue-head:   #1a0808;
-      --rescue-title:  #fca5a5;
     }
 
     /* ── Base ─────────────────────────────────────────────────────────────── */
@@ -149,10 +141,7 @@
     .score-md { background:#fef9c3;color:#854d0e; } .dark .score-md { background:#422006;color:#fde047; }
     .score-lo { background:#fee2e2;color:#991b1b; } .dark .score-lo { background:#450a0a;color:#fca5a5; }
 
-    /* ── Rescue items ─────────────────────────────────────────────────────── */
-    .rescue-item { display:flex;align-items:flex-start;gap:12px;padding:12px;background:var(--rescue-bg);border:1px solid var(--rescue-border);border-radius:12px; }
-
-    /* ── Pagination ───────────────────────────────────────────────────────── */
+/* ── Pagination ───────────────────────────────────────────────────────── */
     .c-page-btn {
       padding: 6px 12px; font-size: .875rem; border-radius: 8px; cursor: pointer;
       background: var(--input-bg); border: 1px solid var(--input-border);
@@ -267,24 +256,7 @@
       </div>
     </div>
 
-    <!-- ── Rescue Panel ── -->
-    <div class="mb-6" style="background:var(--rescue-bg);border:1px solid var(--rescue-border);border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)">
-      <div class="flex items-center justify-between px-5 py-3" style="border-bottom:1px solid var(--rescue-border);background:var(--rescue-head)">
-        <div class="flex items-center gap-2">
-          <svg width="16" height="16" fill="none" stroke="#dc2626" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-          </svg>
-          <span style="font-weight:700;color:var(--rescue-title);font-size:.875rem">Rescue Requests — DANGER Replies</span>
-          <span id="rescue-badge" class="hidden" style="background:#dc2626;color:#fff;font-size:.65rem;font-weight:800;padding:1px 7px;border-radius:9999px;margin-left:4px"></span>
-        </div>
-        <button onclick="loadRescueRequests()" style="font-size:.75rem;color:#dc2626;background:none;border:none;cursor:pointer;font-weight:600">Refresh</button>
-      </div>
-      <div id="rescue-list" class="p-4 space-y-2">
-        <p style="color:var(--muted);font-size:.875rem;text-align:center;padding:16px 0">Loading...</p>
-      </div>
-    </div>
-
-    <!-- ── Reports Table ── -->
+<!-- ── Reports Table ── -->
     <div class="c-card overflow-hidden relative" style="box-shadow:0 1px 3px rgba(0,0,0,.06)">
 
       <!-- Loading overlay -->
@@ -423,10 +395,7 @@
   <script>
     requireAuth();
     document.getElementById('logout-btn').addEventListener('click', logout);
-    loadRescueRequests();
-    setInterval(loadRescueRequests, 30000);
-
-    function toggleDark() {
+function toggleDark() {
       const isDark = document.documentElement.classList.toggle('dark');
       localStorage.setItem('adminDark', isDark ? '1' : '0');
       syncDarkIcon();
