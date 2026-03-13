@@ -98,10 +98,15 @@ landa-disaster-resilience-ai/
 
 ### 🤖 AI Acknowledgement
 
-- ChatGPT: used for report drafting, debugging, research
-- GitHub Copilot: code scaffolding for Flutter and FastAPI
-- Midjourney/DALL-E: UI concept image generation
-- Perplexity AI: literature review and case study research
+| Tool | Usage | % Contribution |
+|------|--------|----------------|
+| **Claude** | Code structuring (Flutter/FastAPI/ML), debugging, live multi-agent validation feature | 50% |
+| **Google Gemini** | Early research, logo/visual assets | 15% |
+| **Kiro AI** | Requirements gathering & specs | 10% |
+| **Cursor/Antigravity** | AI code editors (navigation/suggestions) | 15% |
+| **Perplexity AI** | Research, report drafting/references | 10% |
+
+**Note:** All final code, architecture decisions, and core implementation done by team members. Claude powers our live report validation feature via Anthropic API.
 
 ---
 
