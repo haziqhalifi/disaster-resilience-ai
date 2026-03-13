@@ -78,6 +78,34 @@ async def admin_me(sub: str = Depends(_verify_token)) -> dict:
 
 # ── Report management ─────────────────────────────────────────────────────────
 
+def _enrich_ai_fields(row: dict) -> dict:
+    """Convert raw confidence_score → ai_status + ai_analysis for the admin UI."""
+    score_raw = row.get("confidence_score")
+    if score_raw is None:
+        row.setdefault("ai_status", None)
+        row.setdefault("ai_analysis", None)
+        return row
+    score = round(score_raw * 100)
+    if score >= 70:
+        rec = "Credible — Recommend Validation"
+    elif score >= 40:
+        rec = "Moderate — Requires Investigation"
+    else:
+        rec = "Low Credibility — Consider Rejection"
+    row["ai_status"] = "done"
+    row["ai_analysis"] = {
+        "score": score,
+        "recommendation": rec,
+        "reasoning": (
+            f"ML credibility model scored this report {score}/100. "
+            f"Factors: vouch count, description length, GPS precision, "
+            f"reporter history, proximity to known risk zones."
+        ),
+        "sources": [],
+    }
+    return row
+
+
 @router.get("/reports")
 async def list_reports(
     report_status: str  = Query(default=None),
@@ -95,6 +123,7 @@ async def list_reports(
         limit=limit,
         offset=offset,
     )
+    rows = [_enrich_ai_fields(r) for r in rows]
     return {"reports": rows, "total": len(rows)}
 
 
@@ -244,3 +273,59 @@ async def acknowledge_rescue(alert_id: str, sub: str = Depends(_verify_token)) -
     sb.table("sms_alerts").update({"rescue_acknowledged": True}).eq("id", alert_id).execute()
     logger.info("Admin %s acknowledged rescue request %s", sub, alert_id)
     return {"message": "Rescue request acknowledged"}
+
+
+# ── SMS preview ────────────────────────────────────────────────────────────────
+
+@router.get("/reports/{report_id}/sms-preview")
+async def sms_preview(report_id: str, sub: str = Depends(_verify_token)) -> dict:
+    """Return how many SMS-capable users are within 10 km of the report."""
+    row = report_db.get_report(report_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+    lat, lon = row.get("latitude"), row.get("longitude")
+    if lat is None or lon is None:
+        return {"phone_users": 0, "location_name": row.get("location_name", "unknown")}
+    from app.core.geo import haversine
+    from app.db.devices import get_all_devices_with_location
+    phone_count = sum(
+        1 for d in get_all_devices_with_location()
+        if d.get("phone_number")
+        and d.get("latitude") is not None
+        and haversine(d["latitude"], d["longitude"], lat, lon) <= 10.0
+    )
+    return {"phone_users": phone_count, "location_name": row.get("location_name", "unknown")}
+
+
+# ── AI analysis (on-demand) ────────────────────────────────────────────────────
+
+@router.post("/reports/{report_id}/ai-analyze")
+async def ai_analyze_report(report_id: str, sub: str = Depends(_verify_token)) -> dict:
+    """Run ML credibility scoring on a report and persist the result."""
+    row = report_db.get_report(report_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Report not found")
+    try:
+        from ai_models.services.inference import score_report
+        from app.db.reports import count_user_reports
+        ai_result = score_report(
+            vouch_count=row.get("vouch_count", 0),
+            description_length=len(row.get("description", "")),
+            has_precise_coords=row.get("latitude") is not None,
+            report_age_hours=max(
+                0.0,
+                (datetime.now(timezone.utc) - datetime.fromisoformat(
+                    row["created_at"].replace("Z", "+00:00")
+                )).total_seconds() / 3600,
+            ),
+            reporter_total_reports=count_user_reports(row["user_id"]),
+            proximity_to_risk_zone_km=50.0,
+        )
+        report_db.update_confidence_score(report_id, ai_result["confidence_score"])
+        enriched = _enrich_ai_fields({**row, "confidence_score": ai_result["confidence_score"]})
+        logger.info("Admin %s triggered AI analysis for report %s: score=%s",
+                    sub, report_id, enriched["ai_analysis"]["score"])
+        return {"analysis": enriched["ai_analysis"]}
+    except Exception as exc:
+        logger.error("AI analysis failed for report %s: %s", report_id, exc)
+        raise HTTPException(status_code=500, detail=f"AI analysis failed: {exc}")

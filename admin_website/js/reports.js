@@ -401,14 +401,33 @@ document.getElementById('reject-confirm-btn').addEventListener('click', async ()
 
 /* ── AI Analysis ── */
 async function runAiAnalysis(id) {
-  showToast('Running AI analysis… this may take 15–20 seconds.', 'info');
+  // Replace the button with an animated spinner in-row
+  const btn = document.querySelector(`button.btn-ai[onclick="runAiAnalysis('${id}')"]`);
+  const spinner = `<span id="ai-spin-${id}" style="display:inline-flex;align-items:center;gap:6px;font-size:.75rem;color:#2563eb;background:#dbeafe;padding:3px 10px;border-radius:9999px">
+    <svg style="width:12px;height:12px;animation:spin 0.8s linear infinite;flex-shrink:0" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" stroke="#93c5fd" stroke-width="4" opacity=".3"/>
+      <path d="M4 12a8 8 0 018-8" stroke="#2563eb" stroke-width="4" stroke-linecap="round"/>
+    </svg>Analyzing…</span>`;
+  if (btn) btn.outerHTML = spinner;
+
   try {
     const result = await api.aiAnalyze(getToken(), id);
     const score  = result.analysis?.score ?? '?';
     const rec    = result.analysis?.recommendation ?? '';
-    showToast(`AI Score: ${score}/100 — ${rec}. Click the score badge to view the full report.`, 'success');
-    setTimeout(() => loadReports(), 800);
-  } catch (err) { showToast(err.message, 'error'); }
+    const cls    = score >= 70 ? 'score-hi' : score >= 40 ? 'score-md' : 'score-lo';
+    // Swap spinner for result badge immediately (no full reload flash)
+    const spinEl = document.getElementById(`ai-spin-${id}`);
+    if (spinEl) {
+      spinEl.outerHTML = `<button class="score-badge ${cls}" onclick="openAiReport('${id}')" title="Click to view full AI report">${score}/100</button>`;
+    }
+    showToast(`AI Score: ${score}/100 — ${rec}`, 'success');
+    // Reload after a short delay so the badge persists smoothly
+    setTimeout(() => loadReports(), 1500);
+  } catch (err) {
+    const spinEl = document.getElementById(`ai-spin-${id}`);
+    if (spinEl) spinEl.outerHTML = `<button class="btn-a btn-ai" onclick="runAiAnalysis('${id}')">🤖 AI Check</button>`;
+    showToast(err.message, 'error');
+  }
 }
 
 /* ── SMS modal ── */
