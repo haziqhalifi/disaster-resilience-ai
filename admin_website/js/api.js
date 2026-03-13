@@ -14,7 +14,7 @@ async function fetchWithRetry(url, opts = {}, retries = MAX_RETRIES) {
         await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
         continue;
       }
-      throw new Error('Cannot reach backend at ' + API_BASE + '. Ensure FastAPI is running (.\start_backend.ps1).');
+      throw new Error('Cannot reach backend at ' + API_BASE + '. Ensure FastAPI is running (.\\start_backend.ps1).');
     }
   }
 }
@@ -179,6 +179,27 @@ const api = {
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.detail || 'AI analysis failed');
+    }
+    return res.json();
+  },
+
+  async getWarnings(token) {
+    const res = await fetchWithRetry(`${API_BASE}/api/v1/admin/warnings`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 401) { logout(); return []; }
+    return res.json();
+  },
+
+  async deactivateWarning(token, id) {
+    const res = await fetchWithRetry(`${API_BASE}/api/v1/admin/warnings/${id}/deactivate`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || 'Failed to deactivate warning');
     }
     return res.json();
   },

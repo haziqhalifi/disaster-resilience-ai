@@ -256,6 +256,19 @@
       </div>
     </div>
 
+<!-- ── Active Warnings Panel ── -->
+    <div class="c-card" style="margin-bottom:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--card-border)">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.1rem">⚠️</span>
+          <h2 style="font-size:1rem;font-weight:700;color:var(--text-primary)">Active Alerts <span style="font-size:.75rem;font-weight:400;color:var(--text-muted)">(validated — visible to app users)</span></h2>
+          <span id="warnings-count" style="background:#fef3c7;color:#92400e;border-radius:9999px;padding:2px 8px;font-size:.75rem;font-weight:700"></span>
+        </div>
+        <button onclick="loadWarnings()" style="padding:6px 12px;background:transparent;border:1px solid var(--card-border);border-radius:8px;font-size:.8rem;font-weight:600;cursor:pointer;color:var(--text-sub)">↻ Refresh</button>
+      </div>
+      <div id="warnings-list" style="padding:12px 16px;min-height:48px;font-size:.875rem;color:var(--text-sub)">Loading…</div>
+    </div>
+
 <!-- ── Reports Table ── -->
     <div class="c-card overflow-hidden relative" style="box-shadow:0 1px 3px rgba(0,0,0,.06)">
 
@@ -393,12 +406,71 @@
   <!-- Print section -->
   <div id="print-section" style="display:none"></div>
 
-  <script src="js/api.js?v=9"></script>
-  <script src="js/auth.js?v=9"></script>
-  <script src="js/reports.js?v=9"></script>
+  <script src="js/api.js?v=12"></script>
+  <script src="js/auth.js?v=12"></script>
+  <script src="js/reports.js?v=12"></script>
   <script>
     requireAuth();
     document.getElementById('logout-btn').addEventListener('click', logout);
+    loadWarnings();
+
+    async function loadWarnings() {
+      const token = getToken();
+      const el = document.getElementById('warnings-list');
+      const cnt = document.getElementById('warnings-count');
+      try {
+        // Show only VALIDATED community reports — these are what create the
+        // "Flood confirmed" banner + I'm SAFE / I Need Help buttons in the app.
+        const data = await api.getReports(token, { status: 'validated', limit: 50 });
+        const rows = data?.reports || [];
+        if (rows.length === 0) {
+          el.innerHTML = '<p style="color:var(--text-muted);padding:4px 0">No active alerts. App users will not see any warning banners.</p>';
+          cnt.textContent = '0';
+          return;
+        }
+        cnt.textContent = rows.length;
+        const TYPE_COLOR = { flood: '#92400e', landslide: '#7c3aed', blocked_road: '#1e40af', medical_emergency: '#dc2626' };
+        const TYPE_BG    = { flood: '#fef3c7', landslide: '#ede9fe', blocked_road: '#dbeafe', medical_emergency: '#fee2e2' };
+        const TYPE_ICON  = { flood: '🌊', landslide: '⛰️', blocked_road: '🚧', medical_emergency: '🚑' };
+        el.innerHTML = rows.map(r => {
+          const t   = r.report_type || 'unknown';
+          const bg  = TYPE_BG[t]    || '#f3f4f6';
+          const col = TYPE_COLOR[t] || '#374151';
+          const ico = TYPE_ICON[t]  || '⚠️';
+          const ago = r.created_at ? new Date(r.created_at).toLocaleDateString('en-MY') : '';
+          return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--card-border)">
+            <span style="background:${bg};color:${col};border-radius:6px;padding:3px 10px;font-size:.75rem;font-weight:700;text-transform:capitalize;white-space:nowrap">${ico} ${t.replace('_',' ')}</span>
+            <div style="flex:1;min-width:0">
+              <p style="font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.location_name || '(unknown location)'}</p>
+              <p style="font-size:.75rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.description || ''} · ${ago}</p>
+            </div>
+            <button onclick="dismissActiveWarning('${r.id}',this)"
+              style="flex-shrink:0;padding:5px 12px;background:#dc2626;color:#fff;border:none;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer">
+              Resolve
+            </button>
+          </div>`;
+        }).join('');
+      } catch (e) {
+        el.innerHTML = `<p style="color:#dc2626">${e.message}</p>`;
+      }
+    }
+
+    async function dismissActiveWarning(id, btn) {
+      const token = getToken();
+      btn.disabled = true;
+      btn.textContent = '…';
+      try {
+        await api.resolveReport(token, id);
+        await loadWarnings();
+        // Also refresh main reports table so status updates there too
+        loadReports();
+        showToast('Report resolved — warning cleared from app within 60s', 'success');
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = 'Resolve';
+        showToast(e.message, 'error');
+      }
+    }
 function toggleDark() {
       const isDark = document.documentElement.classList.toggle('dark');
       localStorage.setItem('adminDark', isDark ? '1' : '0');

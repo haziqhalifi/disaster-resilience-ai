@@ -13,6 +13,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.config import ADMIN_JWT_SECRET
 from app.db import admin as admin_db
 from app.db import reports as report_db
+from app.db import warnings as warning_db
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -78,31 +79,44 @@ async def admin_me(sub: str = Depends(_verify_token)) -> dict:
 
 # ── Report management ─────────────────────────────────────────────────────────
 
+# In-memory cache: report_id → full Claude analysis result
+# Persists while the server is running; lost on restart (acceptable — admin can re-run)
+_ai_cache: dict[str, dict] = {}
+
+
 def _enrich_ai_fields(row: dict) -> dict:
-    """Convert raw confidence_score → ai_status + ai_analysis for the admin UI."""
+    """Attach ai_status + ai_analysis for the admin UI.
+
+    Rules:
+    - If a Claude analysis is cached for this report → show score badge (ai_status='done')
+    - If report is still 'pending' → always show AI Check button (ai_status=None)
+      so the admin can trigger a real content analysis
+    - Otherwise (validated/rejected/resolved with confidence_score) → show ML score badge
+    """
+    report_id = row.get("id", "")
+
+    # Claude result takes priority
+    if report_id in _ai_cache:
+        row["ai_status"] = "done"
+        row["ai_analysis"] = _ai_cache[report_id]
+        return row
+
+    # Pending reports always show the AI Check button — never show ML auto-score
+    if row.get("status") == "pending":
+        row["ai_status"] = None
+        row["ai_analysis"] = None
+        return row
+
+    # Non-pending: convert ML confidence_score to a badge if available
     score_raw = row.get("confidence_score")
     if score_raw is None:
         row.setdefault("ai_status", None)
         row.setdefault("ai_analysis", None)
         return row
     score = round(score_raw * 100)
-    if score >= 70:
-        rec = "Credible — Recommend Validation"
-    elif score >= 40:
-        rec = "Moderate — Requires Investigation"
-    else:
-        rec = "Low Credibility — Consider Rejection"
+    rec = ("Credible" if score >= 70 else "Moderate" if score >= 40 else "Low Credibility")
     row["ai_status"] = "done"
-    row["ai_analysis"] = {
-        "score": score,
-        "recommendation": rec,
-        "reasoning": (
-            f"ML credibility model scored this report {score}/100. "
-            f"Factors: vouch count, description length, GPS precision, "
-            f"reporter history, proximity to known risk zones."
-        ),
-        "sources": [],
-    }
+    row["ai_analysis"] = {"score": score, "recommendation": rec, "reasoning": "", "sources": []}
     return row
 
 
@@ -297,35 +311,55 @@ async def sms_preview(report_id: str, sub: str = Depends(_verify_token)) -> dict
     return {"phone_users": phone_count, "location_name": row.get("location_name", "unknown")}
 
 
-# ── AI analysis (on-demand) ────────────────────────────────────────────────────
+# ── AI analysis (on-demand, Claude-powered) ────────────────────────────────────
 
 @router.post("/reports/{report_id}/ai-analyze")
 async def ai_analyze_report(report_id: str, sub: str = Depends(_verify_token)) -> dict:
-    """Run ML credibility scoring on a report and persist the result."""
+    """Run multi-agent Claude analysis (news + weather + gov alerts) to assess report credibility."""
     row = report_db.get_report(report_id)
     if not row:
         raise HTTPException(status_code=404, detail="Report not found")
+
+    from app.core.config import ANTHROPIC_API_KEY
+    if not ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=503, detail="AI analysis unavailable — ANTHROPIC_API_KEY not configured")
+
     try:
-        from ai_models.services.inference import score_report
-        from app.db.reports import count_user_reports
-        ai_result = score_report(
-            vouch_count=row.get("vouch_count", 0),
-            description_length=len(row.get("description", "")),
-            has_precise_coords=row.get("latitude") is not None,
-            report_age_hours=max(
-                0.0,
-                (datetime.now(timezone.utc) - datetime.fromisoformat(
-                    row["created_at"].replace("Z", "+00:00")
-                )).total_seconds() / 3600,
-            ),
-            reporter_total_reports=count_user_reports(row["user_id"]),
-            proximity_to_risk_zone_km=50.0,
-        )
-        report_db.update_confidence_score(report_id, ai_result["confidence_score"])
-        enriched = _enrich_ai_fields({**row, "confidence_score": ai_result["confidence_score"]})
-        logger.info("Admin %s triggered AI analysis for report %s: score=%s",
-                    sub, report_id, enriched["ai_analysis"]["score"])
-        return {"analysis": enriched["ai_analysis"]}
+        import asyncio
+        from app.services.ai_analysis import analyze_report
+        loop = asyncio.get_event_loop()
+        analysis = await loop.run_in_executor(None, analyze_report, dict(row))
+
+        # Clamp score
+        analysis["score"] = max(0, min(100, int(analysis.get("score", 50))))
+
+        # Cache and persist score
+        _ai_cache[report_id] = analysis
+        report_db.update_confidence_score(report_id, analysis["score"] / 100)
+
+        logger.info("Admin %s: AI analysis for report %s → score=%s sources=%s",
+                    sub, report_id, analysis["score"], analysis.get("sources"))
+        return {"analysis": analysis}
+
     except Exception as exc:
         logger.error("AI analysis failed for report %s: %s", report_id, exc)
         raise HTTPException(status_code=500, detail=f"AI analysis failed: {exc}")
+
+
+# ── Warnings management ────────────────────────────────────────────────────────
+
+@router.get("/warnings")
+async def list_active_warnings(sub: str = Depends(_verify_token)) -> list[dict]:
+    """Return all active DB warnings (excludes MetMalaysia gov alerts)."""
+    rows = warning_db.list_warnings(active_only=True)
+    return [dict(r) for r in rows]
+
+
+@router.patch("/warnings/{warning_id}/deactivate")
+async def deactivate_warning(warning_id: str, sub: str = Depends(_verify_token)) -> dict:
+    """Deactivate (dismiss) a warning so it no longer appears in the app."""
+    record = warning_db.deactivate_warning(warning_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Warning not found")
+    logger.info("Admin %s deactivated warning %s", sub, warning_id)
+    return {"message": "Warning deactivated", "id": warning_id}

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:geolocator/geolocator.dart';
@@ -37,6 +38,9 @@ class _ReportsTabState extends State<ReportsTab> {
   String? _myCheckinStatus; // 'safe' | 'needs_help' | null
   bool _checkinLoading = false;
 
+  // Auto-refresh so resolved reports disappear without manual pull-to-refresh
+  Timer? _refreshTimer;
+
   // ── Theme helpers ──────────────────────────────────────────────────────────
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
 
@@ -58,6 +62,16 @@ class _ReportsTabState extends State<ReportsTab> {
     _loadNearbyReports();
     // Fetch real location in background and refresh once ready
     _initLocation();
+    // Auto-refresh every 60s so resolved/rejected reports disappear promptly
+    _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (mounted) _loadNearbyReports();
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _initLocation() async {
@@ -480,11 +494,6 @@ class _ReportsTabState extends State<ReportsTab> {
     if (diff.inMinutes < 60) return '${diff.inMinutes} mins ago';
     if (diff.inHours < 24) return '${diff.inHours} hours ago';
     return '${diff.inDays} days ago';
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
   }
 
   @override

@@ -213,7 +213,7 @@ function openAiReport(id) {
   const a       = r.ai_analysis || {};
   const score   = a.score;
   const rec     = (a.recommendation || '').toLowerCase();
-  const recLabel = rec === 'approve' ? '✅ Approve' : rec === 'reject' ? '❌ Reject' : rec === 'monitor' ? '👁 Monitor' : rec || '—';
+  const recLabel = rec === 'approve' ? '✅ Approve' : rec === 'reject' ? '❌ Reject' : rec === 'monitor' ? '👁 Monitor' : a.recommendation || '—';
   const recColor = rec === 'approve' ? '#166534' : rec === 'reject' ? '#991b1b' : '#854d0e';
   const recBg    = rec === 'approve' ? '#dcfce7'  : rec === 'reject' ? '#fee2e2'  : '#fef9c3';
   const barColor = score >= 70 ? '#16a34a' : score >= 40 ? '#d97706' : '#dc2626';
@@ -251,13 +251,12 @@ function openAiReport(id) {
     </div>
 
     ${sources.length ? `<div style="margin-bottom:16px">
-      <p class="text-gray-500 dark:text-gray-400" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Sources Checked (${sources.length}/4)</p>
+      <p class="text-gray-500 dark:text-gray-400" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Sources Checked (${sources.length}/3)</p>
       ${sources.map(s => {
         const labels = {
-          search_news:              '📰 News Search (DuckDuckGo)',
-          check_weather:            '🌧️ Live Weather (Open-Meteo)',
-          check_gov_alerts:         '🏛️ Government Alerts (MetMalaysia)',
-          check_community_signals:  '👥 Community Signals (Photo, Description, Nearby Reports)',
+          search_news:     '📰 News Search (DuckDuckGo)',
+          check_weather:   '🌧️ Live Weather (Open-Meteo)',
+          check_gov_alerts:'🏛️ Government Alerts (MetMalaysia)',
         };
         return `<p class="text-gray-600 dark:text-gray-400" style="font-size:.8rem;margin-top:3px">• ${labels[s] || s}</p>`;
       }).join('')}
@@ -316,13 +315,8 @@ function printAiReport() {
     <p class="pr-title">Analysis / Reasoning</p>
     <p style="line-height:1.7;white-space:pre-wrap">${r.ai_analysis?.reasoning || 'No analysis available.'}</p>
     ${Array.isArray(r.ai_analysis?.sources) && r.ai_analysis.sources.length
-      ? `<p class="pr-title">Sources Checked (${r.ai_analysis.sources.length}/4)</p>${r.ai_analysis.sources.map(s => {
-          const labels = {
-            search_news:             'News Search (DuckDuckGo)',
-            check_weather:           'Live Weather (Open-Meteo)',
-            check_gov_alerts:        'Government Alerts (MetMalaysia)',
-            check_community_signals: 'Community Signals (Photo, Description, Nearby Reports)',
-          };
+      ? `<p class="pr-title">Sources Checked (${r.ai_analysis.sources.length}/3)</p>${r.ai_analysis.sources.map(s => {
+          const labels = { search_news: 'News Search (DuckDuckGo)', check_weather: 'Live Weather (Open-Meteo)', check_gov_alerts: 'Government Alerts (MetMalaysia)' };
           return `<p>• ${labels[s] || s}</p>`;
         }).join('')}`
       : ''}
