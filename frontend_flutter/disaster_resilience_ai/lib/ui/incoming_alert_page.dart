@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'package:disaster_resilience_ai/models/warning_model.dart';
 import 'package:disaster_resilience_ai/ui/emergency_alert_page.dart';
+import 'package:disaster_resilience_ai/utils/accessibility_settings.dart';
 
 /// Full-screen incoming emergency alert — resembles an incoming phone call.
 ///
@@ -36,6 +37,8 @@ class _IncomingAlertPageState extends State<IncomingAlertPage>
   Timer? _vibrationTimer;
   Timer? _ringTimer;
   Timer? _dismissCountdownTimer;
+  bool _reducedMotionEnabled = false;
+  bool _hapticOnlyAlertsEnabled = false;
 
   @override
   void initState() {
@@ -60,13 +63,32 @@ class _IncomingAlertPageState extends State<IncomingAlertPage>
           CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
         );
 
-    // ── Continuous vibration pattern ──
-    _startVibrationLoop();
-    unawaited(_startRingingLoop());
-    _startDismissCountdown();
+    unawaited(_loadAccessibilityAndStartAlertEffects());
 
     // ── Force the screen to stay on and show over the lock screen ──
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  Future<void> _loadAccessibilityAndStartAlertEffects() async {
+    final settings = await AccessibilitySettings.load();
+    if (!mounted) return;
+
+    _reducedMotionEnabled = settings.reducedMotionEnabled;
+    _hapticOnlyAlertsEnabled = settings.hapticOnlyAlertsEnabled;
+
+    if (_reducedMotionEnabled) {
+      _pulseController.stop();
+      _pulseController.value = 1;
+      _slideController.value = 1;
+    }
+
+    _startVibrationLoop();
+    if (!_hapticOnlyAlertsEnabled) {
+      unawaited(_startRingingLoop());
+    }
+    _startDismissCountdown();
+
+    setState(() {});
   }
 
   void _startVibrationLoop() {
@@ -187,13 +209,19 @@ class _IncomingAlertPageState extends State<IncomingAlertPage>
                 _buildPulsingIcon(warning),
                 const SizedBox(height: 28),
                 // ── Title ──
-                Text(
-                  isEvacuate ? 'EVACUATE NOW' : 'EMERGENCY ALERT',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2.0,
+                Semantics(
+                  header: true,
+                  label: isEvacuate
+                      ? 'Emergency alert: evacuate now'
+                      : 'Emergency alert received',
+                  child: Text(
+                    isEvacuate ? 'EVACUATE NOW' : 'EMERGENCY ALERT',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2.0,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -267,30 +295,38 @@ class _IncomingAlertPageState extends State<IncomingAlertPage>
         icon = Icons.info_outline;
     }
 
-    return AnimatedBuilder(
-      animation: _pulseAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _pulseAnimation.value,
-          child: Container(
-            width: 130,
-            height: 130,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withAlpha(30),
-              border: Border.all(color: Colors.white.withAlpha(100), width: 3),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(60),
-                  blurRadius: 30,
-                  spreadRadius: 5,
-                ),
-              ],
-            ),
-            child: Icon(icon, color: Colors.white, size: 60),
+    Widget iconBody = Container(
+      width: 130,
+      height: 130,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withAlpha(30),
+        border: Border.all(color: Colors.white.withAlpha(100), width: 3),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(60),
+            blurRadius: 30,
+            spreadRadius: 5,
           ),
-        );
-      },
+        ],
+      ),
+      child: Icon(icon, color: Colors.white, size: 60),
+    );
+
+    if (!_reducedMotionEnabled) {
+      iconBody = AnimatedBuilder(
+        animation: _pulseAnimation,
+        builder: (context, child) {
+          return Transform.scale(scale: _pulseAnimation.value, child: child);
+        },
+        child: iconBody,
+      );
+    }
+
+    return Semantics(
+      label: 'Hazard icon: ${warning.hazardType.displayName}',
+      image: true,
+      child: iconBody,
     );
   }
 
@@ -444,29 +480,35 @@ class _IncomingAlertPageState extends State<IncomingAlertPage>
               // View full details & evacuate
               Expanded(
                 flex: 2,
-                child: ElevatedButton.icon(
-                  onPressed: _acknowledge,
-                  icon: Icon(
-                    warning.alertLevel == AlertLevel.evacuate
-                        ? Icons.directions_run
-                        : Icons.open_in_new,
-                    size: 20,
-                  ),
-                  label: Text(
-                    warning.alertLevel == AlertLevel.evacuate
-                        ? 'EVACUATE NOW'
-                        : 'VIEW DETAILS',
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD32F2F),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                child: Semantics(
+                  button: true,
+                  label: warning.alertLevel == AlertLevel.evacuate
+                      ? 'Open evacuation guidance now'
+                      : 'Open detailed emergency guidance',
+                  child: ElevatedButton.icon(
+                    onPressed: _acknowledge,
+                    icon: Icon(
+                      warning.alertLevel == AlertLevel.evacuate
+                          ? Icons.directions_run
+                          : Icons.open_in_new,
+                      size: 20,
                     ),
-                    textStyle: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
+                    label: Text(
+                      warning.alertLevel == AlertLevel.evacuate
+                          ? 'EVACUATE NOW'
+                          : 'VIEW DETAILS',
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD32F2F),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      textStyle: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
                     ),
                   ),
                 ),

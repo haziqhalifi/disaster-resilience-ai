@@ -10,6 +10,7 @@ import 'package:disaster_resilience_ai/services/weather_service.dart';
 import 'package:disaster_resilience_ai/ui/edit_profile_page.dart';
 import 'package:disaster_resilience_ai/ui/family_tab.dart';
 import 'package:disaster_resilience_ai/ui/my_submissions_page.dart';
+import 'package:disaster_resilience_ai/utils/accessibility_settings.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({
@@ -38,6 +39,9 @@ class _ProfileTabState extends State<ProfileTab> {
   bool _loading = true;
   String? _error;
   bool _notificationsEnabled = true;
+  bool _largeTextEnabled = false;
+  bool _reducedMotionEnabled = false;
+  bool _hapticOnlyAlertsEnabled = false;
   String _locationLabel = 'Locating...';
   double _currentLat = 3.8077;
   double _currentLon = 103.3260;
@@ -74,9 +78,20 @@ class _ProfileTabState extends State<ProfileTab> {
     super.initState();
     _fetchProfile();
     _loadNotificationPreference();
+    _loadAccessibilitySettings();
     _fetchCurrentLocation();
     _loadPreparedness();
     _loadMyReports();
+  }
+
+  Future<void> _loadAccessibilitySettings() async {
+    final settings = await AccessibilitySettings.load();
+    if (!mounted) return;
+    setState(() {
+      _largeTextEnabled = settings.largeTextEnabled;
+      _reducedMotionEnabled = settings.reducedMotionEnabled;
+      _hapticOnlyAlertsEnabled = settings.hapticOnlyAlertsEnabled;
+    });
   }
 
   Future<void> _loadNotificationPreference() async {
@@ -184,6 +199,30 @@ class _ProfileTabState extends State<ProfileTab> {
     if (!mounted) return;
     setState(() {
       _notificationsEnabled = value;
+    });
+  }
+
+  Future<void> _setLargeTextEnabled(bool value) async {
+    await AccessibilitySettings.setLargeTextEnabled(value);
+    if (!mounted) return;
+    setState(() {
+      _largeTextEnabled = value;
+    });
+  }
+
+  Future<void> _setReducedMotionEnabled(bool value) async {
+    await AccessibilitySettings.setReducedMotionEnabled(value);
+    if (!mounted) return;
+    setState(() {
+      _reducedMotionEnabled = value;
+    });
+  }
+
+  Future<void> _setHapticOnlyAlertsEnabled(bool value) async {
+    await AccessibilitySettings.setHapticOnlyAlertsEnabled(value);
+    if (!mounted) return;
+    setState(() {
+      _hapticOnlyAlertsEnabled = value;
     });
   }
 
@@ -1299,6 +1338,73 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                 );
               },
+            ),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                tr(en: 'Accessibility', ms: 'Kebolehcapaian', zh: '无障碍'),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildSettingItem(
+              tr(en: 'Large text', ms: 'Teks besar', zh: '大号字体'),
+              icon: Icons.text_increase,
+              subtitle: tr(
+                en: 'Increase readability across the app',
+                ms: 'Tingkatkan kebolehbacaan di seluruh aplikasi',
+                zh: '提高整个应用的可读性',
+              ),
+              trailing: Switch(
+                value: _largeTextEnabled,
+                onChanged: _setLargeTextEnabled,
+                activeTrackColor: switchActiveTrack,
+                activeThumbColor: switchActiveThumb,
+                inactiveTrackColor: switchInactiveTrack,
+                inactiveThumbColor: switchInactiveThumb,
+              ),
+            ),
+            _buildSettingItem(
+              tr(en: 'Reduce motion', ms: 'Kurangkan animasi', zh: '减少动态效果'),
+              icon: Icons.motion_photos_off_outlined,
+              subtitle: tr(
+                en: 'Limit pulse and movement on emergency screens',
+                ms: 'Hadkan kesan berdenyut dan pergerakan pada skrin kecemasan',
+                zh: '减少紧急页面的闪烁与移动效果',
+              ),
+              trailing: Switch(
+                value: _reducedMotionEnabled,
+                onChanged: _setReducedMotionEnabled,
+                activeTrackColor: switchActiveTrack,
+                activeThumbColor: switchActiveThumb,
+                inactiveTrackColor: switchInactiveTrack,
+                inactiveThumbColor: switchInactiveThumb,
+              ),
+            ),
+            _buildSettingItem(
+              tr(
+                en: 'Haptic-only emergency alerts',
+                ms: 'Amaran kecemasan haptik sahaja',
+                zh: '仅震动紧急警报',
+              ),
+              icon: Icons.vibration,
+              subtitle: tr(
+                en: 'Use vibration without alarm sound',
+                ms: 'Gunakan getaran tanpa bunyi penggera',
+                zh: '仅使用震动，不播放警报声',
+              ),
+              trailing: Switch(
+                value: _hapticOnlyAlertsEnabled,
+                onChanged: _setHapticOnlyAlertsEnabled,
+                activeTrackColor: switchActiveTrack,
+                activeThumbColor: switchActiveThumb,
+                inactiveTrackColor: switchInactiveTrack,
+                inactiveThumbColor: switchInactiveThumb,
+              ),
             ),
             _buildSettingItem(
               tr(en: 'Dark Mode', ms: 'Mod Gelap', zh: '深色模式'),

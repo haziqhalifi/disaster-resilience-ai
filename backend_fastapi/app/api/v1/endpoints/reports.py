@@ -188,6 +188,17 @@ async def get_my_reports(
     return ReportList(reports=[_to_out(r, current_user.id) for r in rows], total=len(rows))
 
 
+@router.get("/my/all", response_model=ReportList)
+async def get_all_my_reports(
+    current_user: UserOut = Depends(get_current_user),
+) -> ReportList:
+    rows = report_db.get_all_my_reports(user_id=current_user.id)
+    return ReportList(
+        reports=[_to_out(r, current_user.id) for r in rows],
+        total=len(rows),
+    )
+
+
 @router.get("/nearby/list", response_model=ReportList)
 async def get_nearby_reports(
     latitude:      float = Query(..., ge=-90,  le=90),

@@ -527,6 +527,19 @@ class ApiService {
     throw Exception(_extractErrorMessage(response));
   }
 
+  Future<Map<String, dynamic>> fetchAllMyReports({
+    required String accessToken,
+  }) async {
+    final response = await _getWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/reports/my/all'),
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
   Future<Map<String, dynamic>> fetchNearbyReports({
     required String accessToken,
     required double latitude,

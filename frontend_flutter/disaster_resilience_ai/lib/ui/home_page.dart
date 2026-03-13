@@ -1462,23 +1462,41 @@ class _HomePageState extends State<HomePage> {
         child: ExcludeSemantics(
           child: SizedBox(
             width: 72,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? (isDark
-                          ? const Color(0xFF2D5927).withAlpha(64)
-                          : navPrimary.withAlpha(18))
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Center(
-                child: Icon(
-                  isSelected ? selectedIcon : icon,
-                  size: 24,
-                  color: isSelected ? navPrimary : navInactive,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? (isDark
+                              ? const Color(0xFF2D5927).withAlpha(64)
+                              : navPrimary.withAlpha(18))
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Icon(
+                    isSelected ? selectedIcon : icon,
+                    size: 24,
+                    color: isSelected ? navPrimary : navInactive,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? navPrimary : navInactive,
+                    height: 1.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
         ),

@@ -126,6 +126,19 @@ def get_my_reports(
     return res.data or []
 
 
+def get_all_my_reports(user_id: str) -> list[dict]:
+    """Return all reports submitted by the given user, newest first."""
+    sb = get_client()
+    res = (
+        sb.table("reports")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return res.data or []
+
+
 def get_reports_in_bbox(
     min_lat: float, max_lat: float,
     min_lon: float, max_lon: float,

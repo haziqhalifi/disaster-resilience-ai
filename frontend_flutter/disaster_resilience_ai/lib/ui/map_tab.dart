@@ -44,9 +44,7 @@ class _MapTabState extends State<MapTab> {
   // ── Community reports state ───────────────────────────────────────────────
   List<Map<String, dynamic>> _reports = [];
   Timer? _reportRefreshDebounce;
-  String? _lastReportBoundsKey;
   int _reportLoadGeneration = 0;
-  bool _mapReady = false;
 
   // ── Family member locations ───────────────────────────────────────────────
   List<FamilyMemberLocation> _familyMembers = [];
@@ -85,42 +83,17 @@ class _MapTabState extends State<MapTab> {
   }
 
   Future<void> _loadReports({bool force = false}) async {
-    if (!_mapReady) return;
     if (widget.accessToken.isEmpty) {
       if (mounted && _reports.isNotEmpty) {
         setState(() => _reports = []);
       }
       return;
     }
-
-    final bounds = _mapController.camera.visibleBounds;
-    final minLatitude = bounds.south.clamp(-90.0, 90.0);
-    final maxLatitude = bounds.north.clamp(-90.0, 90.0);
-    final minLongitude = bounds.west.clamp(-180.0, 180.0);
-    final maxLongitude = bounds.east.clamp(-180.0, 180.0);
-
-    if (minLongitude > maxLongitude) {
-      return;
-    }
-
-    final boundsKey = [
-      minLatitude.toStringAsFixed(4),
-      maxLatitude.toStringAsFixed(4),
-      minLongitude.toStringAsFixed(4),
-      maxLongitude.toStringAsFixed(4),
-    ].join(':');
-    if (!force && boundsKey == _lastReportBoundsKey) return;
-
-    _lastReportBoundsKey = boundsKey;
     final loadGeneration = ++_reportLoadGeneration;
 
     try {
-      final payload = await _api.fetchReportsInBounds(
+      final payload = await _api.fetchAllMyReports(
         accessToken: widget.accessToken,
-        minLatitude: minLatitude,
-        maxLatitude: maxLatitude,
-        minLongitude: minLongitude,
-        maxLongitude: maxLongitude,
       );
       final rows = (payload['reports'] as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
@@ -188,7 +161,6 @@ class _MapTabState extends State<MapTab> {
         });
         _mapController.move(_userLocation!, 13.0);
       }
-      _scheduleReportRefresh(force: true);
     } catch (_) {
       // Fallback to default
       if (mounted) {
@@ -197,7 +169,6 @@ class _MapTabState extends State<MapTab> {
           _locatingUser = false;
         });
       }
-      _scheduleReportRefresh(force: true);
     }
   }
 
@@ -250,17 +221,9 @@ class _MapTabState extends State<MapTab> {
         initialZoom: 13.0,
         minZoom: 5.0,
         maxZoom: 18.0,
+        onTap: (_, latLng) => _onMapTapped(latLng),
         onMapReady: () {
-          _mapReady = true;
           _scheduleReportRefresh(force: true);
-        },
-        onMapEvent: (event) {
-          if (event is MapEventMoveEnd ||
-              event is MapEventFlingAnimationEnd ||
-              event is MapEventDoubleTapZoomEnd ||
-              event is MapEventNonRotatedSizeChange) {
-            _scheduleReportRefresh();
-          }
         },
       ),
       children: [
@@ -298,6 +261,43 @@ class _MapTabState extends State<MapTab> {
     }).toList();
 
     return PolygonLayer(polygons: polygons);
+  }
+
+  void _onMapTapped(LatLng point) {
+    if (_loadingMap || _mapData == null) return;
+    final area = _adminAreaAtPoint(point);
+    if (area != null) {
+      _showAdminAreaInfo(area);
+    }
+  }
+
+  AdminArea? _adminAreaAtPoint(LatLng point) {
+    final matched = _filteredAdminAreas
+        .where((area) => _isPointInPolygon(point, area.boundary))
+        .toList();
+    if (matched.isEmpty) return null;
+    matched.sort((a, b) => b.riskScore.compareTo(a.riskScore));
+    return matched.first;
+  }
+
+  bool _isPointInPolygon(LatLng point, List<RouteWaypoint> polygon) {
+    if (polygon.length < 3) return false;
+
+    var inside = false;
+    for (var i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      final xi = polygon[i].lon;
+      final yi = polygon[i].lat;
+      final xj = polygon[j].lon;
+      final yj = polygon[j].lat;
+
+      final intersects =
+          ((yi > point.latitude) != (yj > point.latitude)) &&
+          (point.longitude <
+              (xj - xi) * (point.latitude - yi) / (yj - yi + 1e-12) + xi);
+
+      if (intersects) inside = !inside;
+    }
+    return inside;
   }
 
   MarkerLayer _buildMarkers() {
@@ -656,7 +656,6 @@ class _MapTabState extends State<MapTab> {
           if (mounted) {
             _mapController.move(LatLng(lat, lon), 13.0);
             setState(() => _userLocation = LatLng(lat, lon));
-            _scheduleReportRefresh(force: true);
           }
         } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
