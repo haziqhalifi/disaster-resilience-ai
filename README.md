@@ -2,7 +2,7 @@
 
 BorNEO HackWknd 2026 | Case Study 5: Disaster Resilience AI
 
-**Team:** [Team Name]
+**Team:** Lailatul Coder
 **Track:** Technical Track B
 **SDG Targets:** SDG 11.5 + SDG 13
 
@@ -10,8 +10,7 @@ BorNEO HackWknd 2026 | Case Study 5: Disaster Resilience AI
 
 ### 🔗 Project Links
 
-- 🎥 Demo Video (YouTube Unlisted): [PASTE YOUTUBE LINK HERE]
-- 🖼️ Figma Prototype: [PASTE FIGMA LINK HERE]
+- 🎥 Demo Video (YouTube Unlisted): https://youtu.be/GB5vSpPMGHQ
 - 📄 Final Report: /docs/Final-Report.pdf
 
 ---
