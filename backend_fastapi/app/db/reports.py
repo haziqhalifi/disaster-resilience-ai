@@ -108,6 +108,24 @@ def get_nearby_reports(
     return nearby[offset: offset + limit]
 
 
+def get_my_reports(
+    user_id: str,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[dict]:
+    """Return all reports submitted by the given user, newest first."""
+    sb = get_client()
+    res = (
+        sb.table("reports")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .range(offset, offset + limit - 1)
+        .execute()
+    )
+    return res.data or []
+
+
 def get_reports_in_bbox(
     min_lat: float, max_lat: float,
     min_lon: float, max_lon: float,

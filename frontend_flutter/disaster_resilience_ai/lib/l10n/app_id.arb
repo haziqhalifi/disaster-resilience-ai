@@ -22,5 +22,7 @@
   },
   "mapHazardFlood": "Banjir",
   "mapHazardLandslide": "Tanah Longsor",
-  "mapHazardGeneric": "Bahaya"
+  "mapHazardGeneric": "Bahaya",
+  "mapFilterAll": "Semua",
+  "mapLegendCommunityReports": "Laporan Komunitas"
 }

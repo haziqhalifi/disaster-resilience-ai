@@ -182,18 +182,82 @@ class AdminArea {
   }
 }
 
+class OfficialDisaster {
+  final String id;
+  final int sourceId;
+  final String title;
+  final String categoryName;
+  final String hazardType;
+  final String status;
+  final double latitude;
+  final double longitude;
+  final String stateName;
+  final String districtName;
+  final String? startedAt;
+  final String? endedAt;
+  final bool specialCase;
+  final int affectedFamilies;
+  final int affectedPeople;
+  final int evacuationCentres;
+  final bool active;
+
+  const OfficialDisaster({
+    required this.id,
+    required this.sourceId,
+    required this.title,
+    required this.categoryName,
+    required this.hazardType,
+    required this.status,
+    required this.latitude,
+    required this.longitude,
+    required this.stateName,
+    required this.districtName,
+    this.startedAt,
+    this.endedAt,
+    required this.specialCase,
+    required this.affectedFamilies,
+    required this.affectedPeople,
+    required this.evacuationCentres,
+    required this.active,
+  });
+
+  factory OfficialDisaster.fromJson(Map<String, dynamic> json) {
+    return OfficialDisaster(
+      id: json['id'] as String,
+      sourceId: json['source_id'] as int,
+      title: json['title'] as String,
+      categoryName: json['category_name'] as String,
+      hazardType: json['hazard_type'] as String? ?? 'official',
+      status: json['status'] as String? ?? '',
+      latitude: (json['latitude'] as num).toDouble(),
+      longitude: (json['longitude'] as num).toDouble(),
+      stateName: json['state_name'] as String? ?? '',
+      districtName: json['district_name'] as String? ?? '',
+      startedAt: json['started_at'] as String?,
+      endedAt: json['ended_at'] as String?,
+      specialCase: json['special_case'] as bool? ?? false,
+      affectedFamilies: json['affected_families'] as int? ?? 0,
+      affectedPeople: json['affected_people'] as int? ?? 0,
+      evacuationCentres: json['evacuation_centres'] as int? ?? 0,
+      active: json['active'] as bool? ?? true,
+    );
+  }
+}
+
 /// Combined map data response.
 class MapData {
   final List<RiskZone> riskZones;
   final List<EvacuationCentre> evacuationCentres;
   final List<EvacuationRoute> evacuationRoutes;
   final List<AdminArea> adminAreas;
+  final List<OfficialDisaster> officialDisasters;
 
   const MapData({
     required this.riskZones,
     required this.evacuationCentres,
     required this.evacuationRoutes,
     required this.adminAreas,
+    required this.officialDisasters,
   });
 
   factory MapData.fromJson(Map<String, dynamic> json) {
@@ -210,6 +274,10 @@ class MapData {
       adminAreas: ((json['admin_areas'] as List<dynamic>?) ?? const [])
           .map((e) => AdminArea.fromJson(e as Map<String, dynamic>))
           .toList(),
+      officialDisasters:
+          ((json['official_disasters'] as List<dynamic>?) ?? const [])
+              .map((e) => OfficialDisaster.fromJson(e as Map<String, dynamic>))
+              .toList(),
     );
   }
 }

@@ -24,3 +24,20 @@ TWILIO_PHONE_NUMBER: str = os.getenv("TWILIO_PHONE_NUMBER") or os.getenv("TWILIO
 ADMIN_USERNAME: str = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "changeme123")
 ADMIN_JWT_SECRET: str = os.getenv("ADMIN_JWT_SECRET", "admin-secret-key-change-in-production")
+
+# ── NADMA MyDIMS Official Disaster Feed ─────────────────────────────────────
+NADMA_DISASTERS_API_URL: str = os.getenv(
+	"NADMA_DISASTERS_API_URL",
+	"https://mydims.nadma.gov.my/api/disasters",
+)
+NADMA_DISASTERS_API_TOKEN: str = os.getenv(
+	"NADMA_DISASTERS_API_TOKEN",
+	"6571756|yN5L6StiHQOlyouD5FjmMFBOeywAxjPE79x0m7n843ac4e63",
+)
+
+# ── OpenAI Assistant Chatbot ────────────────────────────────────────────────
+OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+OPENAI_ASSISTANT_ID: str = os.getenv(
+	"OPENAI_ASSISTANT_ID",
+	"asst_z53ZlGOoHh76CDfqcBA0t4gC",
+)

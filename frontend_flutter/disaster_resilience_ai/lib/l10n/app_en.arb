@@ -22,5 +22,7 @@
   },
   "mapHazardFlood": "Flood",
   "mapHazardLandslide": "Landslide",
-  "mapHazardGeneric": "Hazard"
+  "mapHazardGeneric": "Hazard",
+  "mapFilterAll": "All",
+  "mapLegendCommunityReports": "Community Reports"
 }

@@ -50,4 +50,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get mapHazardGeneric => '灾害';
+
+  @override
+  String get mapFilterAll => '全部';
+
+  @override
+  String get mapLegendCommunityReports => '社区报告';
 }

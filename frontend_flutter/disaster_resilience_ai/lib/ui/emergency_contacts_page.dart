@@ -1,7 +1,111 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class EmergencyContactsPage extends StatelessWidget {
   const EmergencyContactsPage({super.key});
+
+  static const _sosNumber = '999';
+
+  String _tr(
+    BuildContext context, {
+    required String en,
+    String? id,
+    required String ms,
+    required String zh,
+  }) {
+    switch (Localizations.localeOf(context).languageCode) {
+      case 'ms':
+        return ms;
+      case 'zh':
+        return zh;
+      case 'id':
+        return id ?? ms;
+      default:
+        return en;
+    }
+  }
+
+  Future<void> _callNumber(BuildContext context, String phoneNumber) async {
+    final sanitized = phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
+    final uri = Uri(scheme: 'tel', path: sanitized);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+      return;
+    }
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _tr(
+            context,
+            en: 'Calling is not available on this device.',
+            id: 'Panggilan tidak tersedia di perangkat ini.',
+            ms: 'Panggilan tidak tersedia pada peranti ini.',
+            zh: '此设备无法拨打电话。',
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmAndCallSos(BuildContext context) async {
+    final shouldCall = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(
+            _tr(
+              dialogContext,
+              en: 'Activate SOS',
+              id: 'Aktifkan SOS',
+              ms: 'Aktifkan SOS',
+              zh: '启动 SOS',
+            ),
+          ),
+          content: Text(
+            _tr(
+              dialogContext,
+              en: 'This will open your phone dialer to call 999 immediately.',
+              id: 'Ini akan membuka aplikasi telepon untuk segera menelepon 999.',
+              ms: 'Ini akan membuka pendail telefon untuk menghubungi 999 dengan segera.',
+              zh: '这将立即打开拨号界面并拨打 999。',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(
+                _tr(
+                  dialogContext,
+                  en: 'Cancel',
+                  id: 'Batal',
+                  ms: 'Batal',
+                  zh: '取消',
+                ),
+              ),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(
+                _tr(
+                  dialogContext,
+                  en: 'Call 999',
+                  id: 'Hubungi 999',
+                  ms: 'Hubungi 999',
+                  zh: '拨打 999',
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    if (shouldCall == true && context.mounted) {
+      await _callNumber(context, _sosNumber);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,20 +136,23 @@ class EmergencyContactsPage extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Emergency Contacts',
+          _tr(
+            context,
+            en: 'Emergency Contacts',
+            id: 'Kontak Darurat',
+            ms: 'Kenalan Kecemasan',
+            zh: '紧急联系人',
+          ),
           style: TextStyle(
             color: titleColor,
             fontWeight: FontWeight.bold,
-            fontSize: 16,
+            fontSize: 18,
           ),
         ),
         centerTitle: true,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(
-            height: 1,
-            color: divider,
-          ),
+          child: Container(height: 1, color: divider),
         ),
       ),
       body: SingleChildScrollView(
@@ -69,8 +176,14 @@ class EmergencyContactsPage extends StatelessWidget {
                 children: [
                   const Icon(Icons.sos, color: Colors.white, size: 48),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Emergency SOS',
+                  Text(
+                    _tr(
+                      context,
+                      en: 'Emergency SOS',
+                      id: 'SOS Darurat',
+                      ms: 'SOS Kecemasan',
+                      zh: '紧急 SOS',
+                    ),
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 22,
@@ -78,12 +191,18 @@ class EmergencyContactsPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Tap to alert all emergency contacts\nand nearest rescue teams',
+                  Text(
+                    _tr(
+                      context,
+                      en: 'Call emergency services first, then notify your trusted contacts.',
+                      id: 'Hubungi layanan darurat terlebih dahulu, lalu beri tahu kontak tepercaya Anda.',
+                      ms: 'Hubungi perkhidmatan kecemasan dahulu, kemudian maklumkan kenalan dipercayai anda.',
+                      zh: '请先联系紧急服务，再通知您信任的联系人。',
+                    ),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white70,
-                      fontSize: 13,
+                      fontSize: 14,
                       height: 1.4,
                     ),
                   ),
@@ -91,7 +210,7 @@ class EmergencyContactsPage extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () => _confirmAndCallSos(context),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: Colors.red[700],
@@ -100,8 +219,14 @@ class EmergencyContactsPage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: const Text(
-                        'ACTIVATE SOS',
+                      child: Text(
+                        _tr(
+                          context,
+                          en: 'ACTIVATE SOS',
+                          id: 'AKTIFKAN SOS',
+                          ms: 'AKTIFKAN SOS',
+                          zh: '启动 SOS',
+                        ),
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -117,7 +242,13 @@ class EmergencyContactsPage extends StatelessWidget {
 
             // Official Emergency Numbers
             Text(
-              'Official Emergency Lines',
+              _tr(
+                context,
+                en: 'Official Emergency Lines',
+                id: 'Nomor Darurat Resmi',
+                ms: 'Talian Rasmi Kecemasan',
+                zh: '官方紧急热线',
+              ),
               style: TextStyle(
                 color: sectionTitle,
                 fontSize: 18,
@@ -176,7 +307,13 @@ class EmergencyContactsPage extends StatelessWidget {
 
             // Local Community Contacts
             Text(
-              'Local Community Contacts',
+              _tr(
+                context,
+                en: 'Local Community Contacts',
+                id: 'Kontak Komunitas Lokal',
+                ms: 'Kenalan Komuniti Setempat',
+                zh: '本地社区联系人',
+              ),
               style: TextStyle(
                 color: sectionTitle,
                 fontSize: 18,
@@ -232,19 +369,35 @@ class EmergencyContactsPage extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Tip',
+                          _tr(
+                            context,
+                            en: 'Tip',
+                            id: 'Tips',
+                            ms: 'Petua',
+                            zh: '提示',
+                          ),
                           style: TextStyle(
-                            color: isDark ? Colors.amber[200] : Colors.amber[900],
+                            color: isDark
+                                ? Colors.amber[200]
+                                : Colors.amber[900],
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Save these contacts offline. SMS fallback works when there is no internet.',
+                          _tr(
+                            context,
+                            en: 'Save these contacts offline. SMS fallback works when there is no internet.',
+                            id: 'Simpan kontak ini secara offline. SMS cadangan tetap berfungsi saat tidak ada internet.',
+                            ms: 'Simpan kenalan ini secara luar talian. SMS sandaran masih berfungsi apabila tiada internet.',
+                            zh: '请离线保存这些联系人。没有网络时仍可使用短信备用方案。',
+                          ),
                           style: TextStyle(
-                            color: isDark ? Colors.amber[100] : Colors.amber[800],
-                            fontSize: 12,
+                            color: isDark
+                                ? Colors.amber[100]
+                                : Colors.amber[800],
+                            fontSize: 13,
                             height: 1.4,
                           ),
                         ),
@@ -275,10 +428,10 @@ class EmergencyContactsPage extends StatelessWidget {
     final cardTitle = isDark
         ? const Color(0xFFE5E7EB)
         : const Color(0xFF1E293B);
-    final subtitleColor = isDark
-        ? const Color(0xFF9AA79B)
-        : Colors.grey[500]!;
-    final phoneColor = isDark ? const Color(0xFF9EDB94) : const Color(0xFF2E7D32);
+    final subtitleColor = isDark ? const Color(0xFF9AA79B) : Colors.grey[500]!;
+    final phoneColor = isDark
+        ? const Color(0xFF9EDB94)
+        : const Color(0xFF2E7D32);
     final callChipBg = isDark
         ? const Color(0xFF2D5927).withAlpha(56)
         : const Color(0xFFE8F5E9);
@@ -287,81 +440,108 @@ class EmergencyContactsPage extends StatelessWidget {
         ? iconColor.withAlpha(120)
         : Colors.transparent;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardBg,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withAlpha(64)
-                : Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: iconChipBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: iconChipBorder),
-            ),
-            child: Icon(icon, color: iconColor, size: 24),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: TextStyle(
-                    color: cardTitle,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: TextStyle(color: subtitleColor, fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                phone,
-                style: TextStyle(
-                  color: phoneColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: callChipBg,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.phone,
-                  color: phoneColor,
-                  size: 16,
-                ),
+        onTap: () => _callNumber(context, phone),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? Colors.black.withAlpha(64)
+                    : Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-        ],
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: iconChipBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: iconChipBorder),
+                ),
+                child: Icon(icon, color: iconColor, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: TextStyle(
+                        color: cardTitle,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(color: subtitleColor, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    phone,
+                    style: TextStyle(
+                      color: phoneColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: callChipBg,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.phone, color: phoneColor, size: 16),
+                        const SizedBox(width: 4),
+                        Text(
+                          _tr(
+                            context,
+                            en: 'Call',
+                            id: 'Telepon',
+                            ms: 'Hubungi',
+                            zh: '拨打',
+                          ),
+                          style: TextStyle(
+                            color: phoneColor,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

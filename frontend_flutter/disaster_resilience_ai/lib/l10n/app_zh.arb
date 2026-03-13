@@ -22,5 +22,7 @@
   },
   "mapHazardFlood": "洪水",
   "mapHazardLandslide": "山体滑坡",
-  "mapHazardGeneric": "灾害"
+  "mapHazardGeneric": "灾害",
+  "mapFilterAll": "全部",
+  "mapLegendCommunityReports": "社区报告"
 }

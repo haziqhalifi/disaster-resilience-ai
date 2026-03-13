@@ -8,6 +8,7 @@ import 'package:disaster_resilience_ai/models/warning_model.dart';
 import 'package:disaster_resilience_ai/models/risk_map_model.dart';
 import 'package:disaster_resilience_ai/services/api_service.dart';
 import 'package:disaster_resilience_ai/ui/evacuation_navigation_page.dart';
+import 'package:disaster_resilience_ai/utils/time_utils.dart';
 
 class EmergencyAlertPage extends StatefulWidget {
   const EmergencyAlertPage({super.key, this.warning});
@@ -153,16 +154,28 @@ class _EmergencyAlertPageState extends State<EmergencyAlertPage> {
     return 12742 * asin(sqrt(a));
   }
 
-  String _getDirection(LatLng from, LatLng to) {
+  /// Returns (Bahasa Malaysia direction, English direction)
+  (String, String) _getDirectionBilingual(LatLng from, LatLng to) {
     final latDiff = to.latitude - from.latitude;
     final lonDiff = to.longitude - from.longitude;
-
     if (latDiff.abs() > lonDiff.abs()) {
-      return latDiff > 0 ? 'North' : 'South';
+      return latDiff > 0 ? ('Utara', 'North') : ('Selatan', 'South');
     } else {
-      return lonDiff > 0 ? 'East' : 'West';
+      return lonDiff > 0 ? ('Timur', 'East') : ('Barat', 'West');
     }
   }
+
+  String _safeTipBm(HazardType type) => switch (type) {
+    HazardType.flood => 'Elak jalan rendah berhampiran sungai walaupun kelihatan lebih dekat.',
+    HazardType.infrastructure => 'Jauhi bangunan dan tiang elektrik yang rosak.',
+    _ => 'Ikuti arahan pegawai berwajib dan jangan balik ke kawasan bahaya.',
+  };
+
+  String _safeTipEn(HazardType type) => switch (type) {
+    HazardType.flood => 'Avoid low-lying river paths even if they seem shorter.',
+    HazardType.infrastructure => 'Stay away from damaged buildings and power lines.',
+    _ => 'Follow official instructions and do not return to the danger zone.',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -273,7 +286,7 @@ class _EmergencyAlertPageState extends State<EmergencyAlertPage> {
         : Colors.amber[50]!;
     final fallbackFill = isDark ? Colors.black.withAlpha(56) : Colors.white.withAlpha(38);
     final fallbackBorder = isDark ? Colors.white24 : Colors.white.withAlpha(80);
-    final timeAgo = _timeAgo(w.createdAt);
+    final timeAgo = localizedTimeAgo(w.createdAt, context);
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -497,73 +510,83 @@ class _EmergencyAlertPageState extends State<EmergencyAlertPage> {
                         ],
                       ),
                       const Divider(height: 24),
-                      Text(
-                        'BAHASA MALAYSIA:',
-                        style: TextStyle(
-                          color: isDark ? Colors.white70 : Colors.grey[700],
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Sila bergerak ke arah ${_getDirection(_userLocation!, LatLng(_nearestCentre!.latitude, _nearestCentre!.longitude))} menuju ke ${_nearestCentre!.name}. '
-                        'Jarak adalah lebih kurang ${_calculateDistance(_userLocation!.latitude, _userLocation!.longitude, _nearestCentre!.latitude, _nearestCentre!.longitude).toStringAsFixed(1)} KM dari sini.',
-                        style: TextStyle(
-                          color: cardText,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'ENGLISH:',
-                        style: TextStyle(
-                          color: isDark ? Colors.white70 : Colors.grey[700],
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Please head ${_getDirection(_userLocation!, LatLng(_nearestCentre!.latitude, _nearestCentre!.longitude))} towards ${_nearestCentre!.name}. '
-                        'It is about ${_calculateDistance(_userLocation!.latitude, _userLocation!.longitude, _nearestCentre!.latitude, _nearestCentre!.longitude).toStringAsFixed(1)} KM away.',
-                        style: TextStyle(
-                          color: cardText,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: tipBg,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Row(
+                      Builder(builder: (context) {
+                        final centre = LatLng(_nearestCentre!.latitude, _nearestCentre!.longitude);
+                        final (bmDir, enDir) = _getDirectionBilingual(_userLocation!, centre);
+                        final distKm = _calculateDistance(
+                          _userLocation!.latitude, _userLocation!.longitude,
+                          _nearestCentre!.latitude, _nearestCentre!.longitude,
+                        ).toStringAsFixed(1);
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.tips_and_updates,
-                              color: Colors.amber[800],
-                              size: 20,
+                            Text(
+                              'BAHASA MALAYSIA:',
+                              style: TextStyle(
+                                color: isDark ? Colors.white70 : Colors.grey[700],
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Safe Tip: Avoid low-lying river paths even if they seem shorter.',
-                                style: TextStyle(
-                                  color: cardText,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Sila bergerak ke arah $bmDir menuju ke ${_nearestCentre!.name}. '
+                              'Jarak adalah lebih kurang $distKm KM dari sini.',
+                              style: TextStyle(
+                                color: cardText,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                height: 1.4,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'ENGLISH:',
+                              style: TextStyle(
+                                color: isDark ? Colors.white70 : Colors.grey[700],
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Please head $enDir towards ${_nearestCentre!.name}. '
+                              'It is about $distKm KM away.',
+                              style: TextStyle(
+                                color: cardText,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                height: 1.4,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: tipBg,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.tips_and_updates, color: Colors.amber[800], size: 20),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      '${_safeTipBm(w.hazardType)}\n${_safeTipEn(w.hazardType)}',
+                                      style: TextStyle(
+                                        color: cardText,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        height: 1.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
-                        ),
-                      ),
+                        );
+                      }),
                     ],
                   ),
                 ),
@@ -596,7 +619,7 @@ class _EmergencyAlertPageState extends State<EmergencyAlertPage> {
                           '📍 Location approximated — showing nearest PPS to Dengkil.',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 11,
+                            fontSize: 13,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -608,8 +631,7 @@ class _EmergencyAlertPageState extends State<EmergencyAlertPage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  // Always enabled when nearest centre is found
-                  onPressed: _nearestCentre != null
+                  onPressed: _nearestCentre != null && !_loading
                       ? () {
                           Navigator.push(
                             context,
@@ -633,16 +655,27 @@ class _EmergencyAlertPageState extends State<EmergencyAlertPage> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  icon: Icon(
-                    w.alertLevel == AlertLevel.evacuate
-                        ? Icons.directions_run
-                        : Icons.navigation,
-                    size: 28,
-                  ),
+                  icon: _loading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white70,
+                          ),
+                        )
+                      : Icon(
+                          w.alertLevel == AlertLevel.evacuate
+                              ? Icons.directions_run
+                              : Icons.navigation,
+                          size: 28,
+                        ),
                   label: Text(
-                    w.alertLevel == AlertLevel.evacuate
-                        ? 'EVACUATE NOW'
-                        : 'VIEW SAFE ROUTES',
+                    _loading
+                        ? 'MENCARI PUSAT EVAKUASI...'
+                        : w.alertLevel == AlertLevel.evacuate
+                            ? 'EVACUATE NOW'
+                            : 'VIEW SAFE ROUTES',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -662,9 +695,9 @@ class _EmergencyAlertPageState extends State<EmergencyAlertPage> {
                           : 'TAP TO VIEW RECOMMENDED SAFE ROUTES'),
                 style: TextStyle(
                   color: _routePoints.isEmpty && !_loading
-                      ? (isDark ? scheme.tertiary : Colors.yellow)
+                      ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E))
                       : Colors.white70,
-                  fontSize: 11,
+                  fontSize: 12,
                   letterSpacing: 1.2,
                   fontWeight: FontWeight.bold,
                 ),
@@ -679,22 +712,24 @@ class _EmergencyAlertPageState extends State<EmergencyAlertPage> {
 
   Widget _buildInfoChip(IconData icon, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(38),
+        color: Colors.white.withAlpha(60),
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white38),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: Colors.white, size: 14),
-          const SizedBox(width: 4),
+          Icon(icon, color: Colors.white, size: 16),
+          const SizedBox(width: 6),
           Text(
             label,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              shadows: [Shadow(color: Colors.black38, blurRadius: 4)],
             ),
           ),
         ],
@@ -739,13 +774,6 @@ class _EmergencyAlertPageState extends State<EmergencyAlertPage> {
     }
   }
 
-  String _timeAgo(DateTime dt) {
-    final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    return '${diff.inDays}d ago';
-  }
 
   void _showWarningDetails(BuildContext context, Warning w) {
     final theme = Theme.of(context);

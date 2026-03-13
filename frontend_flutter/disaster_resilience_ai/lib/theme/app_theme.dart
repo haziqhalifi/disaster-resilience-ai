@@ -66,12 +66,12 @@ class AppThemes {
         height: 1.25,
       ),
       bodyLarge: const TextStyle(
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: FontWeight.w400,
         height: 1.35,
       ),
       bodyMedium: const TextStyle(
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: FontWeight.w400,
         height: 1.35,
       ),
@@ -81,12 +81,12 @@ class AppThemes {
         height: 1.2,
       ),
       labelMedium: const TextStyle(
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: FontWeight.w600,
         height: 1.2,
       ),
       labelSmall: const TextStyle(
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: FontWeight.w600,
         height: 1.2,
       ),

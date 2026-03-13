@@ -106,6 +106,26 @@ class AdminAreaOut(BaseModel):
     boundary: list[WaypointOut]
 
 
+class OfficialDisasterOut(BaseModel):
+    id: str
+    source_id: int
+    title: str
+    category_name: str
+    hazard_type: str
+    status: str
+    latitude: float
+    longitude: float
+    state_name: str = ""
+    district_name: str = ""
+    started_at: str | None = None
+    ended_at: str | None = None
+    special_case: bool = False
+    affected_families: int = Field(default=0, ge=0)
+    affected_people: int = Field(default=0, ge=0)
+    evacuation_centres: int = Field(default=0, ge=0)
+    active: bool = True
+
+
 class EvacuationRouteCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     start_lat: float = Field(..., ge=-90.0, le=90.0)
@@ -147,3 +167,4 @@ class MapDataResponse(BaseModel):
     evacuation_centres: list[EvacuationCentreOut]
     evacuation_routes: list[EvacuationRouteOut]
     admin_areas: list[AdminAreaOut] = Field(default_factory=list)
+    official_disasters: list[OfficialDisasterOut] = Field(default_factory=list)
