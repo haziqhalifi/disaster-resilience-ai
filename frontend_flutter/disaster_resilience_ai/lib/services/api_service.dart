@@ -41,6 +41,8 @@ class ApiService {
   static const int _maxRetries = 3;
   static const Duration _retryDelay = Duration(milliseconds: 800);
   static const String _prefsKey = 'api_base_url';
+  // Known stale IP prefixes to clear from SharedPreferences on startup
+  static const List<String> _staleIpPrefixes = ['192.168.56.', '10.87.52.'];
   static const String _baseUrlOverride = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: '',
@@ -64,7 +66,7 @@ class ApiService {
       return 'http://localhost:8000';
     }
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://172.20.10.4:8000';
+      return 'http://10.0.2.2:8000'; // emulator default; real devices use --dart-define=API_BASE_URL
     }
     return 'http://localhost:8000';
   }
@@ -73,8 +75,8 @@ class ApiService {
   static Future<void> initFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString(_prefsKey);
-    // Clear stale saved URLs pointing to old IPs
-    if (saved != null && (saved.contains('192.168.56.') || saved.contains('10.87.52.'))) {
+    // Clear stale saved URLs pointing to known old IPs
+    if (saved != null && _staleIpPrefixes.any(saved.contains)) {
       await prefs.remove(_prefsKey);
       _storedBaseUrl = null;
     } else {

@@ -6,13 +6,12 @@
 # 3. Run this script (it will show your IP and run the app)
 
 $root = $PSScriptRoot
-$ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
-    $_.InterfaceAlias -match '^Wi-Fi$'
-} | Select-Object -First 1).IPAddress
+$allIPv4 = Get-NetIPAddress -AddressFamily IPv4
+$ip = ($allIPv4 | Where-Object { $_.InterfaceAlias -match '^Wi-Fi$' } | Select-Object -First 1).IPAddress
 
 if (-not $ip) {
-    $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
-        $_.InterfaceAlias -notmatch 'Loopback|Bluetooth|vEthernet|Ethernet [23]|Local Area' -and
+    $ip = ($allIPv4 | Where-Object {
+        $_.InterfaceAlias -notmatch 'Loopback|Bluetooth|vEthernet|Ethernet \d+|Local Area' -and
         $_.IPAddress -notmatch '^169\.254\.|^127\.'
     } | Select-Object -First 1).IPAddress
 }
