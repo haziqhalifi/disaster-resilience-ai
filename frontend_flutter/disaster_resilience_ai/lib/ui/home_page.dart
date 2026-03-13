@@ -254,9 +254,9 @@ class _HomePageState extends State<HomePage> {
         );
       }
     };
-    // Refresh warning cards on every poll so resolved warnings disappear
+    // Refresh warning cards on every poll so resolved warnings disappear (silent — no spinner)
     notif.onPollComplete = () {
-      if (mounted) _fetchWarnings();
+      if (mounted) _fetchWarnings(silent: true);
     };
     notif.startPolling(
       accessToken: _accessToken,
@@ -330,11 +330,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// Fetch warnings from the backend.
-  Future<void> _fetchWarnings() async {
-    setState(() {
-      _loadingWarnings = true;
-      _warningError = null;
-    });
+  /// [silent] = true skips the loading spinner (used for background poll refreshes).
+  Future<void> _fetchWarnings({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loadingWarnings = true;
+        _warningError = null;
+      });
+    }
 
     try {
       // Fetch nearby warnings, all active warnings, and validated community reports in parallel

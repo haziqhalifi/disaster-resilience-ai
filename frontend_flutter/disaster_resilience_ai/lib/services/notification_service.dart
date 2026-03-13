@@ -19,7 +19,7 @@ class NotificationService {
 
   static const _lastCheckKey = 'notification_last_check';
   static const _dismissedKey = 'notification_dismissed_ids';
-  static const _pollInterval = Duration(seconds: 30);
+  static const _pollInterval = Duration(seconds: 10);
 
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
@@ -48,6 +48,9 @@ class NotificationService {
 
   /// Cached list of warnings shown in the latest poll (for tap lookup).
   List<Warning> _recentWarnings = [];
+
+  /// IDs of warnings currently showing a full-screen alert — prevents duplicates.
+  final Set<String> _activeAlertIds = {};
 
   /// Initialise the local-notification plugin and request permissions.
   Future<void> init() async {
@@ -113,6 +116,11 @@ class NotificationService {
     }
   }
 
+  /// Remove a warning from the active-alert set (call when alert is dismissed/acknowledged).
+  void clearActiveAlert(String warningId) {
+    _activeAlertIds.remove(warningId);
+  }
+
   // ── Internal ──────────────────────────────────────────────────────────────
 
   Future<void> _checkForNewWarnings() async {
@@ -167,8 +175,11 @@ class NotificationService {
             warning.alertLevel == AlertLevel.evacuate;
 
         if (isHighSeverity && onEmergencyAlert != null) {
-          // Trigger full-screen incoming alert experience
-          onEmergencyAlert!(warning);
+          // Only show one full-screen alert per active warning
+          if (!_activeAlertIds.contains(warning.id)) {
+            _activeAlertIds.add(warning.id);
+            onEmergencyAlert!(warning);
+          }
         }
         // Always also post a system notification (visible in tray)
         if (!kIsWeb) await _showNotification(warning);
@@ -315,7 +326,8 @@ class NotificationService {
     _recentWarnings = [warning, ..._recentWarnings.take(9)];
 
     // Trigger call-style screen first, then also post a tray notification.
-    if (onEmergencyAlert != null) {
+    if (onEmergencyAlert != null && !_activeAlertIds.contains(warning.id)) {
+      _activeAlertIds.add(warning.id);
       onEmergencyAlert!(warning);
     }
     await _showNotification(warning);

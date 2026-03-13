@@ -166,6 +166,7 @@ class _IncomingAlertPageState extends State<IncomingAlertPage>
 
   void _acknowledge() {
     _stopAlertEffects();
+    NotificationService.instance.clearActiveAlert(widget.warning.id);
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => EmergencyAlertPage(warning: widget.warning),
@@ -177,11 +178,16 @@ class _IncomingAlertPageState extends State<IncomingAlertPage>
     if (_dismissCountdown > 0) return;
     _stopAlertEffects();
     NotificationService.instance.dismissWarning(widget.warning.id);
+    NotificationService.instance.clearActiveAlert(widget.warning.id);
     Navigator.of(context).pop();
   }
 
   Future<void> _submitCheckin(String status) async {
     if (_checkinSubmitting || _checkinStatus != null) return;
+    // Stop alarm immediately — don't wait for the API call
+    _stopAlertEffects();
+    NotificationService.instance.dismissWarning(widget.warning.id);
+    NotificationService.instance.clearActiveAlert(widget.warning.id);
     setState(() => _checkinSubmitting = true);
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -193,15 +199,11 @@ class _IncomingAlertPageState extends State<IncomingAlertPage>
       setState(() => _checkinStatus = status);
 
       if (status == 'safe') {
-        // Confirmed safe → stop alarm and auto-dismiss after brief confirmation
-        _stopAlertEffects();
-        NotificationService.instance.dismissWarning(widget.warning.id);
+        // Confirmed safe → auto-dismiss after brief confirmation
         await Future.delayed(const Duration(milliseconds: 1500));
         if (mounted) Navigator.of(context).pop();
       } else {
-        // Needs help → stop alarm, go to EmergencyAlertPage for evacuation route
-        _stopAlertEffects();
-        NotificationService.instance.dismissWarning(widget.warning.id);
+        // Needs help → go to EmergencyAlertPage for evacuation route
         await Future.delayed(const Duration(milliseconds: 500));
         if (mounted) {
           Navigator.of(context).pushReplacement(
