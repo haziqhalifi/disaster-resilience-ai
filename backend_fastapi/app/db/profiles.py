@@ -9,6 +9,7 @@ class UserProfileRecord(TypedDict):
     full_name: Optional[str]
     phone_number: Optional[str]
     blood_type: Optional[str]
+    profile_photo_url: Optional[str]
     allergies: str
     medical_conditions: str
     emergency_contact_name: Optional[str]

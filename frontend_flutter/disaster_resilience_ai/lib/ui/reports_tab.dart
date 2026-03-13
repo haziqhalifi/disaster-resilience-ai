@@ -862,8 +862,12 @@ class _ReportsTabState extends State<ReportsTab> {
                           _buildChip(
                             icon: Icons.warning_amber_rounded,
                             label: 'Needs Help',
-                            fg: isDark ? const Color(0xFFFCA5A5) : Colors.red.shade700,
-                            bg: isDark ? const Color(0xFF3E1D1D) : Colors.red.shade50,
+                            fg: isDark
+                                ? const Color(0xFFFCA5A5)
+                                : Colors.red.shade700,
+                            bg: isDark
+                                ? const Color(0xFF3E1D1D)
+                                : Colors.red.shade50,
                           ),
                         if (item.confidenceScore != null)
                           _buildChip(
@@ -974,13 +978,23 @@ class _ReportsTabState extends State<ReportsTab> {
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 11, color: fg),
           const SizedBox(width: 3),
-          Text(label, style: TextStyle(color: fg, fontSize: 10, fontWeight: FontWeight.w700)),
+          Text(
+            label,
+            style: TextStyle(
+              color: fg,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
@@ -993,14 +1007,18 @@ class _ReportsTabState extends State<ReportsTab> {
   }
 
   Color _aiCredFg(double score, bool isDark) {
-    if (score >= 0.75) return isDark ? const Color(0xFF86EFAC) : Colors.green.shade700;
-    if (score >= 0.50) return isDark ? const Color(0xFFFCD34D) : Colors.amber.shade700;
+    if (score >= 0.75)
+      return isDark ? const Color(0xFF86EFAC) : Colors.green.shade700;
+    if (score >= 0.50)
+      return isDark ? const Color(0xFFFCD34D) : Colors.amber.shade700;
     return isDark ? const Color(0xFFFCA5A5) : Colors.red.shade700;
   }
 
   Color _aiCredBg(double score, bool isDark) {
-    if (score >= 0.75) return isDark ? const Color(0xFF14532D) : Colors.green.shade50;
-    if (score >= 0.50) return isDark ? const Color(0xFF373018) : Colors.amber.shade50;
+    if (score >= 0.75)
+      return isDark ? const Color(0xFF14532D) : Colors.green.shade50;
+    if (score >= 0.50)
+      return isDark ? const Color(0xFF373018) : Colors.amber.shade50;
     return isDark ? const Color(0xFF3E1D1D) : Colors.red.shade50;
   }
 

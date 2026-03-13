@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:disaster_resilience_ai/models/profile_model.dart';
@@ -37,6 +38,7 @@ class _ProfileTabState extends State<ProfileTab> {
   final WeatherService _weatherService = WeatherService();
   UserProfile? _profile;
   bool _loading = true;
+  bool _uploadingProfilePhoto = false;
   String? _error;
   bool _notificationsEnabled = true;
   bool _largeTextEnabled = false;
@@ -114,11 +116,12 @@ class _ProfileTabState extends State<ProfileTab> {
       final rows = (payload['reports'] as List<dynamic>? ?? [])
           .whereType<Map<String, dynamic>>()
           .toList();
-      if (mounted)
+      if (mounted) {
         setState(() {
           _myReports = rows;
           _loadingMyReports = false;
         });
+      }
     } catch (_) {
       if (mounted) setState(() => _loadingMyReports = false);
     }
@@ -304,11 +307,16 @@ class _ProfileTabState extends State<ProfileTab> {
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFF2E7D32).withAlpha(26),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFF2E7D32)),
+                              border: Border.all(
+                                color: const Color(0xFF2E7D32),
+                              ),
                             ),
                             child: const Text(
                               'ASEAN-Ready',
@@ -396,6 +404,121 @@ class _ProfileTabState extends State<ProfileTab> {
 
     if (result == true) {
       _fetchProfile();
+    }
+  }
+
+  Future<void> _showProfileActions() async {
+    final tr = AppLanguageScope.tr;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: Text(
+                  tr(
+                    ctx,
+                    en: 'Upload Profile Photo',
+                    ms: 'Muat Naik Foto Profil',
+                    zh: '上传头像照片',
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndUploadProfilePhoto();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: Text(
+                  tr(
+                    ctx,
+                    en: 'Edit Profile Details',
+                    ms: 'Sunting Butiran Profil',
+                    zh: '编辑个人资料详情',
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _editProfile();
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAndUploadProfilePhoto() async {
+    if (_uploadingProfilePhoto) return;
+    setState(() => _uploadingProfilePhoto = true);
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+        withData: true,
+      );
+      if (picked == null || picked.files.isEmpty) {
+        return;
+      }
+
+      final file = picked.files.first;
+      final bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        throw Exception('Unable to read selected image');
+      }
+
+      final fileName = file.name.isNotEmpty ? file.name : 'profile-photo.jpg';
+      final lower = fileName.toLowerCase();
+      final contentType = lower.endsWith('.png')
+          ? 'image/png'
+          : lower.endsWith('.webp')
+          ? 'image/webp'
+          : 'image/jpeg';
+
+      await _api.uploadProfilePhoto(
+        accessToken: widget.accessToken,
+        bytes: bytes,
+        filename: fileName,
+        contentType: contentType,
+      );
+
+      await _fetchProfile();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLanguageScope.tr(
+              context,
+              en: 'Profile photo updated successfully.',
+              ms: 'Foto profil berjaya dikemas kini.',
+              zh: '头像照片更新成功。',
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLanguageScope.tr(
+              context,
+              en: 'Unable to upload profile photo: $e',
+              ms: 'Tidak dapat memuat naik foto profil: $e',
+              zh: '无法上传头像照片：$e',
+            ),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _uploadingProfilePhoto = false);
     }
   }
 
@@ -693,10 +816,10 @@ class _ProfileTabState extends State<ProfileTab> {
                                           .trim(),
                                     },
                                   );
-                                  if (!mounted) return;
+                                  if (!ctx.mounted) return;
                                   Navigator.pop(ctx);
                                   await _fetchProfile();
-                                  if (!mounted) return;
+                                  if (!context.mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -710,7 +833,7 @@ class _ProfileTabState extends State<ProfileTab> {
                                     ),
                                   );
                                 } catch (e) {
-                                  if (!mounted) return;
+                                  if (!context.mounted) return;
                                   setSheetState(() => saving = false);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
@@ -867,6 +990,7 @@ class _ProfileTabState extends State<ProfileTab> {
     final preparednessPercent = (_preparednessProgress * 100).round();
     final landaId =
         'RAI-${profile.userId.replaceAll(RegExp(r'[^0-9A-Za-z]'), '').toUpperCase().padLeft(4, '0').substring(0, 4)}';
+    final hasProfilePhoto = profile.profilePhotoUrl?.isNotEmpty ?? false;
 
     return Scaffold(
       backgroundColor: pageBg,
@@ -893,23 +1017,59 @@ class _ProfileTabState extends State<ProfileTab> {
                         child: CircleAvatar(
                           radius: 50,
                           backgroundColor: const Color(0xFFE6EFE5),
-                          child: Text(
-                            widget.username.isNotEmpty
-                                ? widget.username[0].toUpperCase()
-                                : 'U',
-                            style: const TextStyle(
-                              color: primary,
-                              fontSize: 38,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          backgroundImage: hasProfilePhoto
+                              ? NetworkImage(profile.profilePhotoUrl!)
+                              : null,
+                          onBackgroundImageError: hasProfilePhoto
+                              ? (exception, stackTrace) {
+                                  // Fall back to initials when image fails to load.
+                                  if (!mounted) return;
+                                  final currentUrl = _profile?.profilePhotoUrl;
+                                  if (currentUrl == null ||
+                                      currentUrl.isEmpty) {
+                                    return;
+                                  }
+                                  final safeProfile = _profile;
+                                  if (safeProfile == null) return;
+                                  setState(() {
+                                    _profile = UserProfile(
+                                      userId: safeProfile.userId,
+                                      fullName: safeProfile.fullName,
+                                      phoneNumber: safeProfile.phoneNumber,
+                                      bloodType: safeProfile.bloodType,
+                                      profilePhotoUrl: null,
+                                      allergies: safeProfile.allergies,
+                                      medicalConditions:
+                                          safeProfile.medicalConditions,
+                                      emergencyContactName:
+                                          safeProfile.emergencyContactName,
+                                      emergencyContactRelationship: safeProfile
+                                          .emergencyContactRelationship,
+                                      emergencyContactPhone:
+                                          safeProfile.emergencyContactPhone,
+                                    );
+                                  });
+                                }
+                              : null,
+                          child: hasProfilePhoto
+                              ? null
+                              : Text(
+                                  widget.username.isNotEmpty
+                                      ? widget.username[0].toUpperCase()
+                                      : 'U',
+                                  style: const TextStyle(
+                                    color: primary,
+                                    fontSize: 38,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                         ),
                       ),
                       Positioned(
                         right: 2,
                         bottom: 2,
                         child: InkWell(
-                          onTap: _editProfile,
+                          onTap: _showProfileActions,
                           borderRadius: BorderRadius.circular(20),
                           child: Container(
                             padding: const EdgeInsets.all(7),
@@ -917,11 +1077,20 @@ class _ProfileTabState extends State<ProfileTab> {
                               color: primary,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
-                              Icons.edit,
-                              color: Colors.white,
-                              size: 14,
-                            ),
+                            child: _uploadingProfilePhoto
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.camera_alt,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
                           ),
                         ),
                       ),
@@ -1262,7 +1431,8 @@ class _ProfileTabState extends State<ProfileTab> {
             _buildSettingItem(
               tr(en: 'Language', ms: 'Bahasa', zh: '语言'),
               icon: Icons.translate,
-              subtitle: '${languageController.label}  ·  ${tr(en: "ASEAN-Ready", ms: "Sedia ASEAN", zh: "东盟就绪")}  🇲🇾 🇮🇩 🇺🇸 🇨🇳',
+              subtitle:
+                  '${languageController.label}  ·  ${tr(en: "ASEAN-Ready", ms: "Sedia ASEAN", zh: "东盟就绪")}  🇲🇾 🇮🇩 🇺🇸 🇨🇳',
               onTap: _selectLanguage,
             ),
             _buildSettingItem(

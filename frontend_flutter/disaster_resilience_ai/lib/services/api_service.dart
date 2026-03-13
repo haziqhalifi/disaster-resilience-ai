@@ -448,6 +448,34 @@ class ApiService {
     throw Exception(_extractErrorMessage(response));
   }
 
+  Future<Map<String, dynamic>> uploadProfilePhoto({
+    required String accessToken,
+    required Uint8List bytes,
+    required String filename,
+    required String contentType,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/api/v1/profile/me/photo/upload'),
+    );
+    request.headers['Authorization'] = 'Bearer $accessToken';
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: _parseMediaType(contentType),
+      ),
+    );
+
+    final streamed = await request.send().timeout(_requestTimeout);
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
   // ── Family Location Sharing ─────────────────────────────────────────────
 
   Future<Map<String, dynamic>> inviteFamilyMember({
