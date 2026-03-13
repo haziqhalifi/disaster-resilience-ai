@@ -1,78 +1,112 @@
-# Disaster Resilience AI
+### LANDA – Local AI Network for Disaster Alerts
 
-A monorepo for a disaster resilience platform combining a Flutter mobile app, a FastAPI backend, and Python-based AI/ML models.
+BorNEO HackWknd 2026 | Case Study 5: Disaster Resilience AI
 
-## Repository Structure
-
-```
-disaster-resilience-ai/
-├── frontend_flutter/    # Flutter mobile application
-├── backend_fastapi/     # FastAPI REST API server
-└── ai_models/           # Python package for ML models
-```
-
-## Components
-
-### 1. Frontend — Flutter Mobile App (`frontend_flutter/`)
-
-A cross-platform mobile application built with Flutter that communicates with the FastAPI backend to display disaster alerts and risk predictions.
-
-### 2. Backend — FastAPI REST API (`backend_fastapi/`)
-
-A Python REST API that serves disaster alert data and exposes ML model predictions via HTTP endpoints.
-
-### 3. AI Models — Python ML Package (`ai_models/`)
-
-A Python package containing machine learning models for disaster risk prediction. Imported by the backend as a local package.
+**Team:** [Team Name]
+**Track:** Technical Track B
+**SDG Targets:** SDG 11.5 + SDG 13
 
 ---
 
-## Getting Started
+### 🔗 Project Links
 
-### Prerequisites
+- 🎥 Demo Video (YouTube Unlisted): [PASTE YOUTUBE LINK HERE]
+- 🖼️ Figma Prototype: [PASTE FIGMA LINK HERE]
+- 📄 Final Report: /docs/Final-Report.pdf
 
-- Python 3.10+
-- Flutter SDK 3.x+
-- pip / virtualenv
+---
 
-### Running the Backend
+### 📱 About LANDA
 
-```bash
-cd backend_fastapi
+LANDA is an AI-powered disaster resilience platform built for rural ASEAN communities, combining hyper-local alerts, AI-assisted risk mapping, community reporting, IoT siren fallback, school preparedness tools, and multilingual delivery so vulnerable populations can receive, understand, and act on critical disaster information even when connectivity is limited.
 
-# Create and activate a virtual environment
-python -m venv venv
-# Windows
-venv\Scripts\activate
-# macOS/Linux
-venv\Scripts\activate
+---
 
-# Install dependencies (includes ai_models as editable local package)
-pip install -r requirements.txt
-pip install -e ../ai_models
+### 🚀 Setup Instructions
 
-# Start the server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
+#### Frontend (Flutter)
 
-The API will be available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
-
-### Running the Flutter App
+The Flutter client is located in `frontend_flutter/disaster_resilience_ai`.
 
 ```bash
 cd frontend_flutter/disaster_resilience_ai
-
-# Get dependencies
 flutter pub get
-
-# Run on a connected device or emulator
 flutter run
 ```
 
-Update the backend base URL in `lib/services/api_service.dart` if your server is not at `http://10.0.2.2:8000` (Android emulator default for localhost).
+#### Backend (FastAPI)
+
+```bash
+cd backend_fastapi
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+#### AI Models
+
+```bash
+cd ai_models
+pip install -r requirements.txt
+python services/inference.py
+```
 
 ---
 
-## License
+### 🗂️ Repository Structure
 
-MIT
+```text
+landa-disaster-resilience-ai/
+|-- README.md
+|-- admin_website/
+|   |-- index.html
+|   |-- login.html
+|   `-- js/
+|-- ai_models/
+|   |-- __init__.py
+|   |-- pyproject.toml
+|   |-- requirements.txt
+|   |-- models/
+|   `-- services/
+|-- backend_fastapi/
+|   |-- requirements.txt
+|   |-- app/
+|   |   |-- api/
+|   |   |-- core/
+|   |   |-- db/
+|   |   |-- schemas/
+|   |   `-- services/
+|   |-- migrations/
+|   |-- scripts/
+|   `-- uploads/
+|-- docs/
+|   |-- Demo-Video.md
+|   |-- Final-Report.pdf
+|   |-- malaysia.district.geojson
+|   |-- Selangor_DUN_2015.geojson
+|   `-- supabase_migrations.sql
+`-- frontend_flutter/
+    `-- disaster_resilience_ai/
+        |-- android/
+        |-- assets/
+        |-- ios/
+        |-- lib/
+        |-- pubspec.yaml
+        |-- web/
+        `-- windows/
+```
+
+---
+
+### 🤖 AI Acknowledgement
+
+- ChatGPT: used for report drafting, debugging, research
+- GitHub Copilot: code scaffolding for Flutter and FastAPI
+- Midjourney/DALL-E: UI concept image generation
+- Perplexity AI: literature review and case study research
+
+---
+
+### 🌏 SDG Alignment
+
+- SDG 11: Sustainable Cities and Communities (Target 11.5)
+- SDG 13: Climate Action
