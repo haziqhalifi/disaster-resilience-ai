@@ -1390,46 +1390,71 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  List<Widget>? _buildTopBarActions(bool isDark) {
+  void _openChatbot() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ChatbotPage()),
+    );
+  }
+
+  Widget? _buildHomeChatFab(bool isDark) {
     if (_selectedIndex != 0) {
       return null;
     }
 
-    final chatTextColor = isDark
+    final captionBg = isDark ? const Color(0xFF1B251B) : Colors.white;
+    final captionText = isDark
         ? const Color(0xFFE5E7EB)
         : const Color(0xFF163A12);
-    final chatBorder = isDark
-        ? const Color(0xFF3A4A3A)
-        : const Color(0xFFCEE4C8);
+    final captionBorder = isDark
+        ? const Color(0xFF3B5B3F)
+        : const Color(0xFFD7E8D4);
 
-    final actions = <Widget>[
-      Padding(
-        padding: const EdgeInsets.only(right: 6),
-        child: TextButton.icon(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ChatbotPage()),
-            );
-          },
-          style: TextButton.styleFrom(
-            foregroundColor: chatTextColor,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-              side: BorderSide(color: chatBorder),
-            ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        FloatingActionButton(
+          onPressed: _openChatbot,
+          tooltip: _tr(
+            en: 'Open TIARA assistant',
+            ms: 'Buka pembantu TIARA',
+            zh: '打开 TIARA 助手',
           ),
-          icon: const Icon(Icons.chat_bubble_rounded, size: 16),
-          label: const Text(
-            'LANDAi',
-            style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.2),
+          backgroundColor: isDark ? const Color(0xFF1F3A24) : Colors.white,
+          elevation: 4,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+            side: BorderSide(color: captionBorder),
+          ),
+          child: const CircleAvatar(
+            radius: 20,
+            backgroundImage: AssetImage('assets/images/tiara.png'),
+            backgroundColor: Colors.transparent,
           ),
         ),
-      ),
-    ];
-
-    return actions;
+        Transform.translate(
+          offset: const Offset(0, -1),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: captionBg,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: captionBorder),
+            ),
+            child: Text(
+              _tr(en: 'AskTiara', ms: 'AskTiara', zh: 'AskTiara'),
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: captionText,
+                letterSpacing: 0.1,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   void _scrollHomeToTop() {
@@ -1541,10 +1566,11 @@ class _HomePageState extends State<HomePage> {
                 preferredSize: const Size.fromHeight(1),
                 child: Container(height: 1, color: borderColor),
               ),
-              actions: _buildTopBarActions(isDark),
             )
           : null,
       body: _buildBody(),
+      floatingActionButton: _buildHomeChatFab(isDark),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: barBg,

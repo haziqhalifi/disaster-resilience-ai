@@ -60,13 +60,13 @@ class _ChatbotPageState extends State<ChatbotPage>
   String _welcomeText(AppLanguage language) {
     return switch (language) {
       AppLanguage.english =>
-        'Hi there! 👋 I\'m your LANDA assistant.\n\nAsk me anything about floods, earthquakes, evacuation, emergency kits, or how to use this app!',
+        'Hi there! 👋 I am TIARA, your LANDA assistant.\n\nAsk me anything about floods, earthquakes, evacuation, emergency kits, or how to use this app!',
       AppLanguage.indonesian =>
-        'Hai! 👋 Saya asisten LANDA Anda.\n\nTanyakan apa saja tentang banjir, gempa bumi, evakuasi, perlengkapan darurat, atau cara menggunakan aplikasi ini!',
+        'Hai! 👋 Saya TIARA, asisten LANDA Anda.\n\nTanyakan apa saja tentang banjir, gempa bumi, evakuasi, perlengkapan darurat, atau cara menggunakan aplikasi ini!',
       AppLanguage.malay =>
-        'Hai! 👋 Saya pembantu LANDA anda.\n\nTanya saya apa-apa tentang banjir, gempa bumi, pemindahan, kit kecemasan, atau cara menggunakan aplikasi ini!',
+        'Hai! 👋 Saya TIARA, pembantu LANDA anda.\n\nTanya saya apa-apa tentang banjir, gempa bumi, pemindahan, kit kecemasan, atau cara menggunakan aplikasi ini!',
       AppLanguage.chinese =>
-        '你好！👋 我是你的 LANDA 助手。\n\n你可以问我任何关于洪水、地震、撤离、应急包，或如何使用本应用的问题！',
+        '你好！👋 我是 TIARA，你的 LANDA 助手。\n\n你可以问我任何关于洪水、地震、撤离、应急包，或如何使用本应用的问题！',
     };
   }
 
@@ -238,10 +238,10 @@ class _ChatbotPageState extends State<ChatbotPage>
                 ),
                 Text(
                   switch (language) {
-                    AppLanguage.english => 'Assistant Chatbot',
-                    AppLanguage.indonesian => 'Asisten Chatbot',
-                    AppLanguage.malay => 'Pembantu Chatbot',
-                    AppLanguage.chinese => '智能助手',
+                    AppLanguage.english => 'TIARA Chatbot',
+                    AppLanguage.indonesian => 'Chatbot TIARA',
+                    AppLanguage.malay => 'Chatbot TIARA',
+                    AppLanguage.chinese => 'TIARA 聊天助手',
                   },
                   style: TextStyle(
                     color: Colors.white.withAlpha(204),
