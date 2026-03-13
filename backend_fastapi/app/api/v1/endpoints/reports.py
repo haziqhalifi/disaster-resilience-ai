@@ -36,8 +36,14 @@ _MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
 
 def _to_out(row: dict, current_user_id: str | None = None) -> ReportOut:
-    vouched = report_db.user_has_vouched(row["id"], current_user_id) if current_user_id else False
-    helpful = report_db.user_marked_helpful(row["id"], current_user_id) if current_user_id else False
+    try:
+        vouched = report_db.user_has_vouched(row["id"], current_user_id) if current_user_id else False
+    except Exception:
+        vouched = False
+    try:
+        helpful = report_db.user_marked_helpful(row["id"], current_user_id) if current_user_id else False
+    except Exception:
+        helpful = False
     return ReportOut(
         id=row["id"],
         user_id=row["user_id"],
@@ -210,13 +216,10 @@ async def get_nearby_reports(
     offset:        int   = Query(default=0,  ge=0),
     current_user: UserOut = Depends(get_current_user),
 ) -> ReportList:
-    status_list = [s.strip() for s in status_filter.split(",")] if status_filter else None
-    # Parse comma-separated status values into a list
     parsed_status = [s.strip() for s in status_filter.split(",")] if status_filter else None
     rows = report_db.get_nearby_reports(
         latitude=latitude, longitude=longitude,
         radius_km=radius_km, report_type=report_type,
-        status_filter=status_list,
         status_filter=parsed_status,
         limit=limit, offset=offset,
     )

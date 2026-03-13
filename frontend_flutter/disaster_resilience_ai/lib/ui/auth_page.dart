@@ -69,6 +69,10 @@ class _AuthPageState extends State<AuthPage> {
         email: result.email,
         username: result.username,
       );
+      await ApiService.initTokens(
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      );
 
       if (!mounted) {
         return;
@@ -103,27 +107,42 @@ class _AuthPageState extends State<AuthPage> {
   Future<void> _restoreSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(_tokenKey);
+      var token = prefs.getString(_tokenKey);
       final email = prefs.getString(_emailKey);
       final username = prefs.getString(_usernameKey);
 
       if (token == null || email == null || username == null) {
-        if (mounted) {
-          setState(() => _restoring = false);
+        if (mounted) setState(() => _restoring = false);
+        return;
+      }
+
+      // Seed static token so tryRefreshSession can use the stored refresh token.
+      await ApiService.initTokens(accessToken: token);
+
+      // Try the stored token; if expired (401), attempt a silent refresh.
+      try {
+        await _api.me(token);
+      } catch (_) {
+        final refreshed = await ApiService.tryRefreshSession();
+        if (refreshed == null) {
+          // Refresh also failed — clear session and show login.
+          await prefs.remove(_tokenKey);
+          await prefs.remove(_emailKey);
+          await prefs.remove(_usernameKey);
+          if (mounted) setState(() => _restoring = false);
+          return;
         }
-        return;
+        // Refresh succeeded — persist the new access token.
+        token = refreshed.accessToken;
+        await prefs.setString(_tokenKey, token);
       }
 
-      await _api.me(token);
-
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) =>
-              HomePage(accessToken: token, email: email, username: username),
+              HomePage(accessToken: token!, email: email, username: username),
         ),
       );
     } catch (_) {
@@ -131,9 +150,7 @@ class _AuthPageState extends State<AuthPage> {
       await prefs.remove(_tokenKey);
       await prefs.remove(_emailKey);
       await prefs.remove(_usernameKey);
-      if (mounted) {
-        setState(() => _restoring = false);
-      }
+      if (mounted) setState(() => _restoring = false);
     }
   }
 

@@ -288,8 +288,9 @@ def reject_report(report_id: str, *, resolved_by: str, reason: str) -> ReportRec
 
 def delete_report(report_id: str) -> bool:
     sb = get_client()
-    sb.table("reports").delete().eq("id", report_id).execute()
-    return True
+    res = sb.table("reports").delete().eq("id", report_id).execute()
+    # supabase-py returns the deleted rows in res.data; empty list = nothing deleted (RLS block or wrong ID)
+    return bool(res.data)
 
 
 def expire_old_reports() -> int:

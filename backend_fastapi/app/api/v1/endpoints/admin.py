@@ -184,7 +184,12 @@ async def delete_report(report_id: str, sub: str = Depends(_verify_token)) -> No
     row = report_db.get_report(report_id)
     if not row:
         raise HTTPException(status_code=404, detail="Report not found")
-    report_db.delete_report(report_id)
+    deleted = report_db.delete_report(report_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=500,
+            detail="Delete failed — Supabase returned no rows. Check that SUPABASE_KEY is the service-role key (not the anon key).",
+        )
 
 
 @router.get("/stats")

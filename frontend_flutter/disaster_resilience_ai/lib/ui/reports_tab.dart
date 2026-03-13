@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:disaster_resilience_ai/localization/app_language.dart';
 import 'package:disaster_resilience_ai/services/api_service.dart';
 import 'package:disaster_resilience_ai/services/weather_service.dart';
@@ -33,28 +34,10 @@ class _ReportsTabState extends State<ReportsTab> {
   String _locationName = 'My Location';
   bool _isCurrentLocation = true;
   final Set<String> _vouchingIds = <String>{};
-
-  // Safety banner — shown when a flood report is within 10km
-  List<dynamic> _nearbyFloodReports = [];
-  String? _myCheckinStatus; // 'safe' | 'needs_help' | null
-  bool _checkinLoading = false;
-
-  // Auto-refresh so resolved reports disappear without manual pull-to-refresh
   Timer? _refreshTimer;
-
-  // ── Theme helpers ──────────────────────────────────────────────────────────
-  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
-
-  Color get _bg          => _isDark ? const Color(0xFF0F140F) : const Color(0xFFF0F2F5);
-  Color get _card        => _isDark ? const Color(0xFF1B251B) : Colors.white;
-  Color get _cardBorder  => _isDark ? const Color(0xFF334236) : const Color(0xFFE2E8F0);
-  Color get _textPrimary => _isDark ? const Color(0xFFE5E7EB) : const Color(0xFF1E293B);
-  Color get _textSub     => _isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600;
-  Color get _textMuted   => _isDark ? const Color(0xFF64748B) : Colors.grey.shade400;
-  Color get _inputFill   => _isDark ? const Color(0xFF1E2720) : const Color(0xFFF8F9FA);
-
-  static const Color _green = Color(0xFF2E7D32);
-
+  List<Map<String, dynamic>> _nearbyFloodReports = [];
+  String? _myCheckinStatus;
+  bool _checkinLoading = false;
 
   @override
   void initState() {
@@ -138,8 +121,7 @@ class _ReportsTabState extends State<ReportsTab> {
         latitude: _userLat,
         longitude: _userLon,
         radiusKm: 50,
-<<<<<<< HEAD
-        statusFilter: 'pending,validated',
+        statusFilter: 'validated',
       );
       final rows = (payload['reports'] as List<dynamic>? ?? const []);
       final parsed = rows
@@ -160,12 +142,28 @@ class _ReportsTabState extends State<ReportsTab> {
               ) <= 10.0)
           .toList();
 
+      // Restore persisted checkin status for the current nearby flood report
+      String? savedCheckin;
+      if (nearbyFloods.isNotEmpty) {
+        final floodId = nearbyFloods.first['id']?.toString() ?? '';
+        if (floodId.isNotEmpty) {
+          final prefs = await SharedPreferences.getInstance();
+          savedCheckin = prefs.getString('checkin_$floodId');
+        }
+      }
+
       if (mounted) {
         setState(() {
           _liveItems = parsed;
           _nearbyFloodReports = nearbyFloods;
           _loadingLiveReports = false;
-          _retryCount = 0; // reset on success
+          _retryCount = 0;
+          // Only restore if user hasn't manually changed status this session
+          if (savedCheckin != null && _myCheckinStatus == null) {
+            _myCheckinStatus = savedCheckin;
+          }
+          // Clear checkin if flood is gone
+          if (nearbyFloods.isEmpty) _myCheckinStatus = null;
         });
       }
     } catch (e) {
@@ -206,6 +204,14 @@ class _ReportsTabState extends State<ReportsTab> {
     setState(() { _checkinLoading = true; });
     try {
       await _api.selfCheckin(accessToken: widget.accessToken, status: status);
+      // Persist checkin so it survives tab rebuilds and app restarts
+      if (_nearbyFloodReports.isNotEmpty) {
+        final floodId = _nearbyFloodReports.first['id']?.toString() ?? '';
+        if (floodId.isNotEmpty) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('checkin_$floodId', status);
+        }
+      }
       if (mounted) {
         setState(() { _myCheckinStatus = status; _checkinLoading = false; });
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -276,9 +282,9 @@ class _ReportsTabState extends State<ReportsTab> {
 
   // ── Safety self-checkin banner (SMS feature) ──────────────────────────────
 
-  Widget _buildSafetyBanner() {
+  Widget _buildSafetyBanner({bool isDark = false}) {
     if (_nearbyFloodReports.isEmpty) return const SizedBox.shrink();
-    final flood = _nearbyFloodReports.first as Map<String, dynamic>;
+    final flood = _nearbyFloodReports.first;
     final location = flood['location_name'] as String? ?? 'nearby area';
     final distKm = flood['distance_km'] as num?;
     final distText = distKm != null ? ' (${distKm.toStringAsFixed(1)} km)' : '';
@@ -290,9 +296,9 @@ class _ReportsTabState extends State<ReportsTab> {
       decoration: BoxDecoration(
         color: alreadyChecked
             ? (isSafe
-                ? (_isDark ? const Color(0xFF14291A) : Colors.green.shade50)
-                : (_isDark ? const Color(0xFF2A1010) : Colors.red.shade50))
-            : (_isDark ? const Color(0xFF2A1A0A) : Colors.orange.shade50),
+                ? (isDark ? const Color(0xFF14291A) : Colors.green.shade50)
+                : (isDark ? const Color(0xFF2A1010) : Colors.red.shade50))
+            : (isDark ? const Color(0xFF2A1A0A) : Colors.orange.shade50),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: alreadyChecked
@@ -319,9 +325,9 @@ class _ReportsTabState extends State<ReportsTab> {
                 fontSize: 13,
                 color: alreadyChecked
                     ? (isSafe
-                        ? (_isDark ? Colors.green.shade300 : Colors.green.shade800)
-                        : (_isDark ? Colors.red.shade300 : Colors.red.shade800))
-                    : (_isDark ? Colors.orange.shade300 : Colors.orange.shade900),
+                        ? (isDark ? Colors.green.shade300 : Colors.green.shade800)
+                        : (isDark ? Colors.red.shade300 : Colors.red.shade800))
+                    : (isDark ? Colors.orange.shade300 : Colors.orange.shade900),
               ),
             ),
           ),
@@ -344,7 +350,7 @@ class _ReportsTabState extends State<ReportsTab> {
             'Are you safe? Confirm your status — your family and the admin will be notified.',
             style: TextStyle(
               fontSize: 12,
-              color: _isDark ? Colors.orange.shade200 : Colors.orange.shade800,
+              color: isDark ? Colors.orange.shade200 : Colors.orange.shade800,
               height: 1.4,
             ),
           ),
@@ -388,19 +394,19 @@ class _ReportsTabState extends State<ReportsTab> {
             Expanded(
               child: Text(
                 'Your family has been notified. Tap to update your status.',
-                style: TextStyle(fontSize: 11, color: _isDark ? Colors.grey.shade400 : Colors.grey.shade600),
+                style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
               ),
             ),
             GestureDetector(
               onTap: () => setState(() { _myCheckinStatus = null; }),
-              child: Text('Change', style: TextStyle(fontSize: 11, color: _isDark ? Colors.blue.shade300 : Colors.blue.shade700, fontWeight: FontWeight.bold)),
+              child: Text('Change', style: TextStyle(fontSize: 11, color: isDark ? Colors.blue.shade300 : Colors.blue.shade700, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(width: 8),
             GestureDetector(
               onTap: () => Navigator.push(context, MaterialPageRoute(
                 builder: (_) => FamilyCheckinPage(accessToken: widget.accessToken),
               )),
-              child: Text('View Family', style: TextStyle(fontSize: 11, color: _isDark ? Colors.green.shade300 : Colors.green.shade700, fontWeight: FontWeight.bold)),
+              child: Text('View Family', style: TextStyle(fontSize: 11, color: isDark ? Colors.green.shade300 : Colors.green.shade700, fontWeight: FontWeight.bold)),
             ),
           ]),
         ],
@@ -674,7 +680,7 @@ class _ReportsTabState extends State<ReportsTab> {
               ),
             ],
             const SizedBox(height: 14),
-            if (_nearbyFloodReports.isNotEmpty) _buildSafetyBanner(),
+            if (_nearbyFloodReports.isNotEmpty) _buildSafetyBanner(isDark: isDark),
             Text(
               tr(en: 'Nearby Activity', ms: 'Aktiviti Berhampiran', zh: '附近动态'),
               style: TextStyle(

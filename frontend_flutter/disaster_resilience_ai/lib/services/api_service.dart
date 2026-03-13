@@ -10,12 +10,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthResult {
   final String accessToken;
+  final String? refreshToken;
   final String userId;
   final String username;
   final String email;
 
   const AuthResult({
     required this.accessToken,
+    this.refreshToken,
     required this.userId,
     required this.username,
     required this.email,
@@ -25,6 +27,7 @@ class AuthResult {
     final user = json['user'] as Map<String, dynamic>;
     return AuthResult(
       accessToken: json['access_token'] as String,
+      refreshToken: json['refresh_token'] as String?,
       userId: user['id'] as String,
       username: user['username'] as String,
       email: user['email'] as String,
@@ -61,7 +64,7 @@ class ApiService {
       return 'http://localhost:8000';
     }
     if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8000';
+      return 'http://172.20.10.4:8000';
     }
     return 'http://localhost:8000';
   }
@@ -69,7 +72,14 @@ class ApiService {
   /// Load stored API URL from SharedPreferences. Call at app startup.
   static Future<void> initFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    _storedBaseUrl = prefs.getString(_prefsKey);
+    final saved = prefs.getString(_prefsKey);
+    // Clear stale saved URLs pointing to old IPs
+    if (saved != null && (saved.contains('192.168.56.') || saved.contains('10.87.52.'))) {
+      await prefs.remove(_prefsKey);
+      _storedBaseUrl = null;
+    } else {
+      _storedBaseUrl = saved;
+    }
   }
 
   /// Save API URL and use it for all subsequent requests.
@@ -87,6 +97,61 @@ class ApiService {
     _storedBaseUrl = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_prefsKey);
+  }
+
+  // ── Token management ─────────────────────────────────────────────────────
+
+  static const _refreshTokenPrefsKey = 'auth_refresh_token';
+
+  /// The current live access token (may be newer than what widgets hold).
+  static String _liveAccessToken = '';
+
+  /// Called at login / session restore to seed the live token + refresh token.
+  static Future<void> initTokens({
+    required String accessToken,
+    String? refreshToken,
+  }) async {
+    _liveAccessToken = accessToken;
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_refreshTokenPrefsKey, refreshToken);
+    }
+  }
+
+  /// Returns the current live access token. Use this in API calls so they
+  /// always use the most recently refreshed token.
+  static String get liveAccessToken => _liveAccessToken;
+
+  /// Exchange the stored refresh token for a new access token.
+  /// Returns the new [AuthResult] on success, null if refresh fails.
+  static Future<AuthResult?> tryRefreshSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final storedRefresh = prefs.getString(_refreshTokenPrefsKey);
+    if (storedRefresh == null || storedRefresh.isEmpty) return null;
+
+    try {
+      final client = http.Client();
+      final response = await client
+          .post(
+            Uri.parse('$baseUrl/api/v1/auth/refresh'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'refresh_token': storedRefresh}),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final result = AuthResult.fromJson(
+            jsonDecode(response.body) as Map<String, dynamic>);
+        _liveAccessToken = result.accessToken;
+        if (result.refreshToken != null && result.refreshToken!.isNotEmpty) {
+          await prefs.setString(_refreshTokenPrefsKey, result.refreshToken!);
+        }
+        return result;
+      }
+    } catch (_) {
+      // Refresh failed — caller should redirect to login
+    }
+    return null;
   }
 
   final http.Client _client;

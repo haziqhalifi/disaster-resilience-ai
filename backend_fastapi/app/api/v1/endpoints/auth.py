@@ -111,7 +111,12 @@ async def signup(body: UserSignUp) -> Token:
         )
 
     user_out = UserOut(id=record["id"], username=record["username"], email=record["email"])
-    return Token(access_token=session.access_token, token_type="bearer", user=user_out)
+    return Token(
+        access_token=session.access_token,
+        refresh_token=session.refresh_token,
+        token_type="bearer",
+        user=user_out,
+    )
 
 
 # ── POST /auth/signin ─────────────────────────────────────────────────────────
@@ -191,7 +196,60 @@ async def signin(body: UserSignIn) -> Token:
         )
 
     user_out = UserOut(id=record["id"], username=record["username"], email=record["email"])
-    return Token(access_token=session.access_token, token_type="bearer", user=user_out)
+    return Token(
+        access_token=session.access_token,
+        refresh_token=session.refresh_token,
+        token_type="bearer",
+        user=user_out,
+    )
+
+
+# ── POST /auth/refresh ────────────────────────────────────────────────────────
+
+@router.post(
+    "/refresh",
+    response_model=Token,
+    status_code=status.HTTP_200_OK,
+    summary="Refresh an expired access token using a refresh token",
+)
+async def refresh_token(body: dict) -> Token:
+    """Exchange a valid refresh token for a new access token."""
+    refresh = body.get("refresh_token", "")
+    if not refresh:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="refresh_token is required.",
+        )
+    auth_sb = get_auth_client()
+    try:
+        res = auth_sb.auth.refresh_session(refresh)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token is invalid or expired. Please sign in again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+    session = res.session
+    auth_user = res.user
+    if session is None or auth_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not refresh session.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    record = user_db.get_user_by_id(str(auth_user.id))
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found.")
+
+    user_out = UserOut(id=record["id"], username=record["username"], email=record["email"])
+    return Token(
+        access_token=session.access_token,
+        refresh_token=session.refresh_token,
+        token_type="bearer",
+        user=user_out,
+    )
 
 
 # ── GET /auth/me ──────────────────────────────────────────────────────────────

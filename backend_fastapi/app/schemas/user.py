@@ -36,5 +36,6 @@ class Token(BaseModel):
     """JWT token response returned after successful sign-in or sign-up."""
 
     access_token: str
+    refresh_token: str | None = None
     token_type: str = "bearer"
     user: UserOut

@@ -42,6 +42,10 @@ EASYSENDSMS_API_KEY:  str = os.getenv("EASYSENDSMS_API_KEY", "")
 # Format: E.164 without '+', e.g. 60175815030 for Malaysian number 0175815030
 DEMO_PHONE: str = os.getenv("DEMO_PHONE", "")
 
+# When True, each broadcast sends at most ONE SMS (to the first eligible recipient
+# or DEMO_PHONE). Set SMS_DEMO_MODE=false in .env to broadcast to all users.
+SMS_DEMO_MODE: bool = os.getenv("SMS_DEMO_MODE", "true").lower() not in ("false", "0", "no")
+
 # ── Anthropic / Claude AI ─────────────────────────────────────────────────────
 ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
 

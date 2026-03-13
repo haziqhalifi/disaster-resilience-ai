@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
+from app.core.config import SMS_DEMO_MODE
 from app.core.geo import is_point_in_radius
 from app.db import devices as device_db
 from app.db.warnings import WarningRecord
@@ -164,6 +165,9 @@ async def broadcast_flood_report(report: dict) -> dict:
 
     push_sent = sms_sent = total = 0
 
+    if SMS_DEMO_MODE:
+        logger.info("SMS_DEMO_MODE enabled — broadcast_flood_report will send at most 1 SMS")
+
     for device in device_db.get_all_devices_with_location():
         if device["latitude"] is None or device["longitude"] is None:
             continue
@@ -178,6 +182,10 @@ async def broadcast_flood_report(report: dict) -> dict:
             if _send_push(device["fcm_token"], title, dist_msg, data):
                 push_sent += 1
         elif device.get("phone_number"):
+            # In demo mode, only send one SMS total
+            if SMS_DEMO_MODE and sms_sent >= 1:
+                logger.debug("DEMO MODE: skipping SMS to %s (already sent 1)", device["user_id"])
+                continue
             shelter_name = nearest["name"] if nearest else ""
             shelter_phone = nearest["contact_phone"] if nearest else ""
             shelter_dist = nearest["distance_km"] if nearest else None
@@ -193,6 +201,8 @@ async def broadcast_flood_report(report: dict) -> dict:
             )
             if sent:
                 sms_sent += 1
+                if SMS_DEMO_MODE:
+                    logger.info("DEMO MODE: sent 1 SMS (would have sent to %d users in full mode)", total)
         else:
             logger.warning("User %s near flood but has no notification channel", device["user_id"])
 
@@ -241,6 +251,9 @@ async def broadcast_report_alert(report: dict) -> dict:
 
     push_sent = sms_sent = total = 0
 
+    if SMS_DEMO_MODE:
+        logger.info("SMS_DEMO_MODE enabled — broadcast_report_alert will send at most 1 SMS")
+
     for device in device_db.get_all_devices_with_location():
         if device["latitude"] is None or device["longitude"] is None:
             continue
@@ -256,6 +269,9 @@ async def broadcast_report_alert(report: dict) -> dict:
             if _send_push(device["fcm_token"], title, body, {"report_id": event_id}):
                 push_sent += 1
         elif device.get("phone_number"):
+            if SMS_DEMO_MODE and sms_sent >= 1:
+                logger.debug("DEMO MODE: skipping SMS to %s (already sent 1)", device["user_id"])
+                continue
             sent = send_emergency_alert(
                 phone_number=device["phone_number"],
                 user_id=device["user_id"],
@@ -266,6 +282,8 @@ async def broadcast_report_alert(report: dict) -> dict:
             )
             if sent:
                 sms_sent += 1
+                if SMS_DEMO_MODE:
+                    logger.info("DEMO MODE: sent 1 SMS (would have sent to %d users in full mode)", total)
         else:
             logger.warning("User %s near incident but has no notification channel", device["user_id"])
 

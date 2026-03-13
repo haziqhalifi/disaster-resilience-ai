@@ -7,9 +7,15 @@
 
 $root = $PSScriptRoot
 $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
-    $_.InterfaceAlias -notmatch 'Loopback|Bluetooth|Virtual' -and
-    $_.IPAddress -match '^192\.168\.|^10\.'
+    $_.InterfaceAlias -match '^Wi-Fi$'
 } | Select-Object -First 1).IPAddress
+
+if (-not $ip) {
+    $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {
+        $_.InterfaceAlias -notmatch 'Loopback|Bluetooth|vEthernet|Ethernet [23]|Local Area' -and
+        $_.IPAddress -notmatch '^169\.254\.|^127\.'
+    } | Select-Object -First 1).IPAddress
+}
 
 if (-not $ip) {
     Write-Host "Could not detect local IP. Use: ipconfig to find your IPv4 address."

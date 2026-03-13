@@ -50,6 +50,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   static const _notificationsPrefKey = 'notifications_enabled';
+  static const _tokenKey = 'auth_access_token';
 
   int _selectedIndex = 0;
   final ScrollController _homeScrollController = ScrollController();
@@ -57,11 +58,18 @@ class _HomePageState extends State<HomePage> {
   final ApiService _api = ApiService();
   final WeatherService _weatherService = WeatherService();
 
+  // ── Live token (refreshed automatically every 50 min) ─────────────────────
+  late String _accessToken;
+  Timer? _tokenRefreshTimer;
+
   // ── Warning state ────────────────────────────────────────────────────────
   bool _loadingWarnings = true;
   List<Warning> _nearbyWarnings = [];
   List<Warning> _allActiveWarnings = [];
   String? _warningError;
+
+  // ── Validated community reports nearby (triggers Warning status) ──────────
+  List<Map<String, dynamic>> _nearbyValidatedReports = [];
 
   // ── Weather state ─────────────────────────────────────────────────────────
   WeatherData? _weather;
@@ -97,12 +105,31 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _accessToken = ApiService.liveAccessToken.isNotEmpty
+        ? ApiService.liveAccessToken
+        : widget.accessToken;
+    _startTokenRefreshTimer();
     _determineLocation();
+  }
+
+  /// Proactively refresh the Supabase JWT every 50 minutes (tokens expire at 60 min).
+  void _startTokenRefreshTimer() {
+    _tokenRefreshTimer?.cancel();
+    _tokenRefreshTimer = Timer.periodic(const Duration(minutes: 50), (_) async {
+      final result = await ApiService.tryRefreshSession();
+      if (result != null && mounted) {
+        setState(() => _accessToken = result.accessToken);
+        // Persist the new token so next app start restores it.
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_tokenKey, result.accessToken);
+      }
+    });
   }
 
   @override
   void dispose() {
     _liveLocationTimer?.cancel();
+    _tokenRefreshTimer?.cancel();
     _homeScrollController.dispose();
     super.dispose();
   }
@@ -232,7 +259,7 @@ class _HomePageState extends State<HomePage> {
       if (mounted) _fetchWarnings();
     };
     notif.startPolling(
-      accessToken: widget.accessToken,
+      accessToken: _accessToken,
       latitude: _userLat,
       longitude: _userLon,
     );
@@ -289,7 +316,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _updateBackendLocation() async {
     try {
       await _api.updateLocation(
-        accessToken: widget.accessToken,
+        accessToken: _accessToken,
         latitude: _userLat,
         longitude: _userLon,
       );
@@ -310,19 +337,31 @@ class _HomePageState extends State<HomePage> {
     });
 
     try {
-      // Fetch both nearby warnings and all active warnings in parallel
+      // Fetch nearby warnings, all active warnings, and validated community reports in parallel
       final results = await Future.wait([
         _api.fetchNearbyWarnings(latitude: _userLat, longitude: _userLon),
         _api.fetchWarnings(activeOnly: true),
+        _api.fetchNearbyReports(
+          accessToken: _accessToken,
+          latitude: _userLat,
+          longitude: _userLon,
+          radiusKm: 10,
+          statusFilter: 'validated',
+        ).catchError((_) => <String, dynamic>{}),
       ]);
 
-      final nearbyData = WarningList.fromJson(results[0]);
-      final allData = WarningList.fromJson(results[1]);
+      final nearbyData = WarningList.fromJson(results[0] as Map<String, dynamic>);
+      final allData = WarningList.fromJson(results[1] as Map<String, dynamic>);
+      final reportsData = results[2] as Map<String, dynamic>;
+      final reportsList = (reportsData['reports'] as List<dynamic>?)
+              ?.cast<Map<String, dynamic>>() ??
+          [];
 
       if (mounted) {
         setState(() {
           _nearbyWarnings = nearbyData.warnings;
           _allActiveWarnings = allData.warnings;
+          _nearbyValidatedReports = reportsList;
           _loadingWarnings = false;
         });
       }
@@ -336,14 +375,20 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  /// Determine the highest alert level from nearby warnings.
+  /// Determine the highest alert level from nearby warnings and validated community reports.
   AlertLevel get _highestAlertLevel {
-    if (_nearbyWarnings.isEmpty) return AlertLevel.advisory;
-    return _nearbyWarnings.fold<AlertLevel>(
-      AlertLevel.advisory,
-      (prev, w) =>
-          w.alertLevel.severityIndex > prev.severityIndex ? w.alertLevel : prev,
-    );
+    AlertLevel level = AlertLevel.advisory;
+    for (final w in _nearbyWarnings) {
+      if (w.alertLevel.severityIndex > level.severityIndex) {
+        level = w.alertLevel;
+      }
+    }
+    // Validated community reports count as at least a Warning
+    if (_nearbyValidatedReports.isNotEmpty &&
+        AlertLevel.warning.severityIndex > level.severityIndex) {
+      level = AlertLevel.warning;
+    }
+    return level;
   }
 
   Future<void> _logout() async {
@@ -451,7 +496,7 @@ class _HomePageState extends State<HomePage> {
       safetyLabel = _tr(en: 'Unknown', ms: 'Tidak Diketahui', zh: '未知');
       safetyColor = const Color(0xFF6B7280);
       safetyIcon = Icons.wifi_off_rounded;
-    } else if (_nearbyWarnings.isEmpty) {
+    } else if (_nearbyWarnings.isEmpty && _nearbyValidatedReports.isEmpty) {
       safetyLabel = _tr(en: 'Secure', ms: 'Selamat', zh: '安全');
       safetyColor = const Color(0xFF2D5927);
       safetyIcon = Icons.check_circle_rounded;
@@ -1045,7 +1090,7 @@ class _HomePageState extends State<HomePage> {
                       context,
                       MaterialPageRoute(
                         builder: (_) =>
-                            SubmitReportPage(accessToken: widget.accessToken),
+                            SubmitReportPage(accessToken: _accessToken),
                       ),
                     ),
                   ),
@@ -1056,7 +1101,7 @@ class _HomePageState extends State<HomePage> {
                       context,
                       MaterialPageRoute(
                         builder: (_) =>
-                            FamilyTab(accessToken: widget.accessToken),
+                            FamilyTab(accessToken: _accessToken),
                       ),
                     ),
                   ),
@@ -1341,21 +1386,23 @@ class _HomePageState extends State<HomePage> {
       case 0:
         return _buildDashboard();
       case 1:
-        return MapTab(accessToken: widget.accessToken);
+        return MapTab(accessToken: _accessToken);
       case 2:
         return NotificationsTab(
-          accessToken: widget.accessToken,
+          accessToken: _accessToken,
           warnings: _allActiveWarnings,
+          latitude: _userLat,
+          longitude: _userLon,
         );
       case 3:
         return ProfileTab(
-          accessToken: widget.accessToken,
+          accessToken: _accessToken,
           username: widget.username,
           email: widget.email,
           onLogout: _logout,
         );
       case 4:
-        return SirenManagementPage(accessToken: widget.accessToken);
+        return SirenManagementPage(accessToken: _accessToken);
       default:
         return _buildDashboard();
     }
