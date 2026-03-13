@@ -83,7 +83,12 @@ flutter_launcher_icons:
   ios: true
   web:
     generate: true
+  windows:
+    generate: true
+    image_path: assets/images/logo.png
   image_path: assets/images/logo.png
+  adaptive_icon_background: "#2E7D32"
+  adaptive_icon_foreground: assets/images/logo.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

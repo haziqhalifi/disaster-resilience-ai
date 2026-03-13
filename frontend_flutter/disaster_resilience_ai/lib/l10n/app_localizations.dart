@@ -179,6 +179,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hazard'**
   String get mapHazardGeneric;
+
+  /// No description provided for @mapFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get mapFilterAll;
+
+  /// No description provided for @mapLegendCommunityReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Community Reports'**
+  String get mapLegendCommunityReports;
 }
 
 class _AppLocalizationsDelegate

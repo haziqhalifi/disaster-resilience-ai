@@ -7,6 +7,7 @@ import 'package:disaster_resilience_ai/theme/app_theme.dart';
 import 'package:disaster_resilience_ai/ui/auth_page.dart';
 import 'package:disaster_resilience_ai/ui/emergency_alert_page.dart';
 import 'package:disaster_resilience_ai/ui/incoming_alert_page.dart';
+import 'package:disaster_resilience_ai/utils/accessibility_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -35,6 +36,7 @@ Future<void> main() async {
 
   final isDarkMode = await AppThemeController.loadInitialDarkMode();
   final initialLanguage = await AppLanguageController.loadInitialLanguage();
+  await AccessibilitySettings.load();
 
   runApp(
     DisasterResilienceApp(
@@ -80,7 +82,11 @@ class _DisasterResilienceAppState extends State<DisasterResilienceApp> {
       child: AppLanguageScope(
         controller: _languageController,
         child: AnimatedBuilder(
-          animation: Listenable.merge([_themeController, _languageController]),
+          animation: Listenable.merge([
+            _themeController,
+            _languageController,
+            AccessibilitySettings.largeTextEnabledNotifier,
+          ]),
           builder: (context, _) {
             return MaterialApp(
               navigatorKey: navigatorKey,
@@ -97,6 +103,19 @@ class _DisasterResilienceAppState extends State<DisasterResilienceApp> {
                 GlobalCupertinoLocalizations.delegate,
               ],
               supportedLocales: AppLocalizations.supportedLocales,
+              builder: (context, child) {
+                final mediaQuery = MediaQuery.of(context);
+                final scale =
+                    AccessibilitySettings.largeTextEnabledNotifier.value
+                    ? 1.15
+                    : 1.0;
+                return MediaQuery(
+                  data: mediaQuery.copyWith(
+                    textScaler: TextScaler.linear(scale),
+                  ),
+                  child: child ?? const SizedBox.shrink(),
+                );
+              },
               home: const AuthPage(),
             );
           },

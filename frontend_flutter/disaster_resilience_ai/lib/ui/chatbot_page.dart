@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:disaster_resilience_ai/localization/app_language.dart';
+import 'package:disaster_resilience_ai/services/api_service.dart';
 import 'package:disaster_resilience_ai/services/chatbot_service.dart';
 import 'package:disaster_resilience_ai/ui/widgets/landa_wordmark.dart';
 
@@ -26,12 +27,14 @@ class ChatbotPage extends StatefulWidget {
 class _ChatbotPageState extends State<ChatbotPage>
     with TickerProviderStateMixin {
   final _chatbot = ChatbotService();
+  final _api = ApiService();
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   final List<_ChatMessage> _messages = [];
   bool _isTyping = false;
   bool _isScrolled = false;
   bool _welcomeInitialized = false;
+  String? _assistantThreadId;
 
   static const _botGreen = Color(0xFF2E7D32);
   static const _botBubble = Color(0xFFE8F5E9);
@@ -118,10 +121,29 @@ class _ChatbotPageState extends State<ChatbotPage>
     });
     _scrollToBottom();
 
-    // Simulate typing delay for realism
-    await Future.delayed(const Duration(milliseconds: 800));
+    await Future.delayed(const Duration(milliseconds: 250));
 
-    final reply = _chatbot.getResponse(trimmed);
+    String reply;
+    try {
+      final result = await _api.sendAssistantMessage(
+        message: trimmed,
+        threadId: _assistantThreadId,
+      );
+
+      final nextThreadId = result['thread_id'] as String?;
+      if (nextThreadId != null && nextThreadId.isNotEmpty) {
+        _assistantThreadId = nextThreadId;
+      }
+
+      reply = (result['reply'] as String?)?.trim() ?? '';
+      if (reply.isEmpty) {
+        throw Exception('Empty assistant reply');
+      }
+    } catch (_) {
+      // Graceful fallback when backend/OpenAI is unreachable.
+      reply = _chatbot.getResponse(trimmed);
+    }
+
     if (!mounted) return;
     setState(() {
       _isTyping = false;
@@ -276,22 +298,7 @@ class _ChatbotPageState extends State<ChatbotPage>
             ? MainAxisAlignment.end
             : MainAxisAlignment.start,
         children: [
-          if (!isUser) ...[
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: _botGreen,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.smart_toy_rounded,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
+          if (!isUser) ...[_buildBotAvatar(), const SizedBox(width: 8)],
           Flexible(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -356,19 +363,7 @@ class _ChatbotPageState extends State<ChatbotPage>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: const BoxDecoration(
-              color: _botGreen,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.smart_toy_rounded,
-              color: Colors.white,
-              size: 16,
-            ),
-          ),
+          _buildBotAvatar(),
           const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -384,6 +379,32 @@ class _ChatbotPageState extends State<ChatbotPage>
             child: _TypingDots(),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBotAvatar() {
+    return ClipOval(
+      child: Image.asset(
+        'assets/images/tiara.png',
+        width: 30,
+        height: 30,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            width: 30,
+            height: 30,
+            decoration: const BoxDecoration(
+              color: _botGreen,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.smart_toy_rounded,
+              color: Colors.white,
+              size: 16,
+            ),
+          );
+        },
       ),
     );
   }

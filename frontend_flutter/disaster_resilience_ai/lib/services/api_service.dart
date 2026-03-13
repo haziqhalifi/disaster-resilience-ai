@@ -128,6 +128,26 @@ class ApiService {
     throw Exception('Prediction failed with status ${response.statusCode}');
   }
 
+  /// Send a chatbot message to the backend OpenAI Assistant proxy.
+  Future<Map<String, dynamic>> sendAssistantMessage({
+    required String message,
+    String? threadId,
+  }) async {
+    final response = await _postWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/chat/assistant'),
+      body: {
+        'message': message,
+        if (threadId != null && threadId.isNotEmpty) 'thread_id': threadId,
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    throw Exception(_extractErrorMessage(response));
+  }
+
   Future<AuthResult> signUp({
     required String username,
     required String email,
@@ -503,6 +523,34 @@ class ApiService {
     throw Exception(_extractErrorMessage(response));
   }
 
+  Future<Map<String, dynamic>> uploadProfilePhoto({
+    required String accessToken,
+    required Uint8List bytes,
+    required String filename,
+    required String contentType,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/api/v1/profile/me/photo/upload'),
+    );
+    request.headers['Authorization'] = 'Bearer $accessToken';
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: _parseMediaType(contentType),
+      ),
+    );
+
+    final streamed = await request.send().timeout(_requestTimeout);
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
   // ── Family Location Sharing ─────────────────────────────────────────────
 
   Future<Map<String, dynamic>> inviteFamilyMember({
@@ -564,6 +612,37 @@ class ApiService {
 
   // ── Community Reports ─────────────────────────────────────────────────────
 
+  Future<Map<String, dynamic>> fetchMyReports({
+    required String accessToken,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/reports/my').replace(
+      queryParameters: {'limit': limit.toString(), 'offset': offset.toString()},
+    );
+    final response = await _getWithNetworkHandling(
+      uri,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
+  Future<Map<String, dynamic>> fetchAllMyReports({
+    required String accessToken,
+  }) async {
+    final response = await _getWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/reports/my/all'),
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
   Future<Map<String, dynamic>> fetchNearbyReports({
     required String accessToken,
     required double latitude,
@@ -579,8 +658,35 @@ class ApiService {
     if (statusFilter != null && statusFilter.isNotEmpty) {
       params['status_filter'] = statusFilter;
     }
-    final uri = Uri.parse('$baseUrl/api/v1/reports/nearby/list').replace(
-      queryParameters: params,
+    final uri = Uri.parse(
+      '$baseUrl/api/v1/reports/nearby/list',
+    ).replace(queryParameters: params);
+    final response = await _getWithNetworkHandling(
+      uri,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractErrorMessage(response));
+  }
+
+  Future<Map<String, dynamic>> fetchReportsInBounds({
+    required String accessToken,
+    required double minLatitude,
+    required double maxLatitude,
+    required double minLongitude,
+    required double maxLongitude,
+    int limit = 200,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/v1/reports/bbox/list').replace(
+      queryParameters: {
+        'min_lat': minLatitude.toString(),
+        'max_lat': maxLatitude.toString(),
+        'min_lon': minLongitude.toString(),
+        'max_lon': maxLongitude.toString(),
+        'limit': limit.toString(),
+      },
     );
     final response = await _getWithNetworkHandling(
       uri,

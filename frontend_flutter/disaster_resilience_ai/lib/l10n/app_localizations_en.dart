@@ -50,4 +50,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mapHazardGeneric => 'Hazard';
+
+  @override
+  String get mapFilterAll => 'All';
+
+  @override
+  String get mapLegendCommunityReports => 'Community Reports';
 }

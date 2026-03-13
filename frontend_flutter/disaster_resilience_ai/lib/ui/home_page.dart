@@ -11,7 +11,7 @@ import 'package:disaster_resilience_ai/services/weather_service.dart';
 import 'package:disaster_resilience_ai/ui/auth_page.dart';
 import 'package:disaster_resilience_ai/ui/emergency_alert_page.dart';
 import 'package:disaster_resilience_ai/ui/emergency_contacts_page.dart';
-import 'package:disaster_resilience_ai/ui/reports_tab.dart';
+import 'package:disaster_resilience_ai/ui/notifications_tab.dart';
 import 'package:disaster_resilience_ai/ui/map_tab.dart';
 import 'package:disaster_resilience_ai/ui/profile_tab.dart';
 import 'package:disaster_resilience_ai/ui/weather_page.dart';
@@ -19,6 +19,8 @@ import 'package:disaster_resilience_ai/ui/chatbot_page.dart';
 import 'package:disaster_resilience_ai/ui/disaster_checklist_page.dart';
 import 'package:disaster_resilience_ai/ui/learn_page.dart';
 import 'package:disaster_resilience_ai/ui/safe_routes_page.dart';
+import 'package:disaster_resilience_ai/ui/submit_report_page.dart';
+import 'package:disaster_resilience_ai/ui/family_tab.dart';
 import 'package:disaster_resilience_ai/models/disaster_news_model.dart';
 import 'package:disaster_resilience_ai/ui/all_warnings_page.dart';
 import 'package:disaster_resilience_ai/ui/all_news_page.dart';
@@ -47,6 +49,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  static const _notificationsPrefKey = 'notifications_enabled';
+
   int _selectedIndex = 0;
   final ScrollController _homeScrollController = ScrollController();
 
@@ -193,7 +197,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// Begin polling for new warnings and showing local notifications.
-  void _startNotificationPolling() {
+  Future<void> _startNotificationPolling() async {
+    final prefs = await SharedPreferences.getInstance();
+    final notificationsEnabled = prefs.getBool(_notificationsPrefKey) ?? true;
+    if (!notificationsEnabled) {
+      NotificationService.instance.stopPolling();
+      return;
+    }
+
     final notif = NotificationService.instance;
     notif.onWarningTap = (warning) {
       if (mounted) {
@@ -399,8 +410,6 @@ class _HomePageState extends State<HomePage> {
             children: [
               _buildStatusSection(),
               const SizedBox(height: 18),
-              _buildWeatherSection(),
-              const SizedBox(height: 14),
               _buildAiRiskCard(),
               const SizedBox(height: 24),
               _buildPrimaryActions(),
@@ -425,14 +434,10 @@ class _HomePageState extends State<HomePage> {
     final borderColor = isDark
         ? const Color(0xFF334236)
         : const Color(0xFF2D5927).withAlpha(32);
-    final chipBg = isDark
-        ? const Color(0xFF2D5927).withAlpha(64)
-        : const Color(0xFF2D5927).withAlpha(16);
-    final chipFg = isDark ? const Color(0xFF9EDB94) : const Color(0xFF2D5927);
 
     final isLoaded = !_loadingWarnings;
     final hasError = _warningError != null;
-    final hazards = hasError ? 0 : _nearbyWarnings.length;
+    final hasWeather = _weather != null;
 
     final String safetyLabel;
     final Color safetyColor;
@@ -478,39 +483,13 @@ class _HomePageState extends State<HomePage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                _tr(en: 'Your Status', ms: 'Status Anda', zh: '您的状态'),
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: titleColor,
-                ),
-              ),
-            ),
-            TextButton.icon(
-              onPressed: _openWeatherPage,
-              icon: Icon(_weather?.icon ?? Icons.cloud_outlined, size: 18),
-              label: Text(
-                _weather != null
-                    ? '${_weather!.temperature.round()}°C'
-                    : '--°C',
-              ),
-              style: TextButton.styleFrom(
-                backgroundColor: chipBg,
-                foregroundColor: chipFg,
-                shape: const StadiumBorder(),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-                minimumSize: const Size(0, 36),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-          ],
+        Text(
+          _tr(en: 'Your Status', ms: 'Status Anda', zh: '您的状态'),
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: titleColor,
+          ),
         ),
         const SizedBox(height: 12),
         GridView.count(
@@ -569,19 +548,7 @@ class _HomePageState extends State<HomePage> {
             Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: () {
-                  if (_allActiveWarnings.isEmpty) {
-                    _openEmergencyDetails();
-                    return;
-                  }
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          AllWarningsPage(warnings: _allActiveWarnings),
-                    ),
-                  );
-                },
+                onTap: _openWeatherPage,
                 borderRadius: BorderRadius.circular(16),
                 child: Ink(
                   padding: const EdgeInsets.all(16),
@@ -594,39 +561,46 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(
-                        hazards > 0
-                            ? Icons.warning_amber_rounded
-                            : Icons.warning_amber_outlined,
-                        color: hazards > 0
-                            ? const Color(0xFFF97316)
-                            : const Color(0xFF2D5927),
+                        hasWeather ? (_weather!.icon) : Icons.cloud_outlined,
+                        color: const Color(0xFF2D5927),
                         size: 30,
                       ),
                       const Spacer(),
                       Text(
                         _tr(
-                          en: 'Active Hazards',
-                          ms: 'Bahaya Aktif',
-                          zh: '当前风险',
+                          en: 'Local Weather',
+                          ms: 'Cuaca Tempatan',
+                          zh: '本地天气',
                         ),
                         style: TextStyle(color: subtleText, fontSize: 13),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        !isLoaded
-                            ? _tr(en: 'Checking', ms: 'Menyemak', zh: '检查中')
-                            : hazards > 0
-                            ? _tr(
-                                en: '$hazards Nearby',
-                                ms: '$hazards Berhampiran',
-                                zh: '$hazards 个附近',
-                              )
-                            : _tr(en: 'None', ms: 'Tiada', zh: '无'),
+                        hasWeather
+                            ? '${_weather!.temperature.round()}°C'
+                            : _tr(
+                                en: 'Unavailable',
+                                ms: 'Tidak Tersedia',
+                                zh: '不可用',
+                              ),
                         style: TextStyle(
                           color: titleColor,
                           fontSize: 24,
                           fontWeight: FontWeight.w800,
                         ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        hasWeather
+                            ? _weather!.description
+                            : _tr(
+                                en: 'Tap to view forecast',
+                                ms: 'Ketik untuk lihat ramalan',
+                                zh: '点击查看天气预报',
+                              ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: subtleText, fontSize: 12),
                       ),
                     ],
                   ),
@@ -974,167 +948,19 @@ class _HomePageState extends State<HomePage> {
     ];
   }
 
-  Widget _buildWeatherSection() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surface = isDark ? const Color(0xFF1B251B) : Colors.white;
-    final headingColor = isDark
-        ? const Color(0xFFE5E7EB)
-        : const Color(0xFF111827);
-    final bodyColor = isDark
-        ? const Color(0xFFB8C2BA)
-        : const Color(0xFF374151);
-    final borderColor = isDark
-        ? const Color(0xFF334236)
-        : const Color(0xFF2D5927).withAlpha(28);
-    final iconChipBg = isDark
-        ? const Color(0xFF2D5927).withAlpha(64)
-        : const Color(0xFF2D5927).withAlpha(16);
-    final iconColor = isDark
-        ? const Color(0xFF9EDB94)
-        : const Color(0xFF2D5927);
-
-    final hasWeather = _weather != null;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: _openWeatherPage,
-        borderRadius: BorderRadius.circular(16),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borderColor),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: iconChipBg,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        hasWeather
-                            ? _weather!.icon
-                            : Icons.thunderstorm_outlined,
-                        color: iconColor,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            hasWeather
-                                ? _tr(
-                                    en: 'Local Weather: ${_weather!.description}',
-                                    ms: 'Cuaca Tempatan: ${_weather!.description}',
-                                    zh: '本地天气：${_weather!.description}',
-                                  )
-                                : _tr(
-                                    en: 'Local Weather Update',
-                                    ms: 'Kemas Kini Cuaca Tempatan',
-                                    zh: '本地天气更新',
-                                  ),
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: headingColor,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            hasWeather
-                                ? _tr(
-                                    en: 'Heavy rainfall risk can shift quickly. Check your nearest safe route now.',
-                                    ms: 'Risiko hujan lebat boleh berubah dengan cepat. Semak laluan selamat terdekat anda sekarang.',
-                                    zh: '强降雨风险可能快速变化。请立即查看最近的安全路线。',
-                                  )
-                                : _tr(
-                                    en: 'Pull down to refresh the latest weather status for your location.',
-                                    ms: 'Tarik ke bawah untuk memuat semula status cuaca terkini bagi lokasi anda.',
-                                    zh: '下拉以刷新您所在位置的最新天气状态。',
-                                  ),
-                            style: TextStyle(
-                              color: bodyColor,
-                              fontSize: 13,
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                height: 146,
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: const BoxDecoration(
-                  borderRadius: BorderRadius.vertical(
-                    bottom: Radius.circular(16),
-                  ),
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF3A6EA5), Color(0xFF22325C)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _locationLabel,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const Spacer(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          hasWeather
-                              ? '${_weather!.temperature.round()}°C'
-                              : '--°C',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 30,
-                          ),
-                        ),
-                        const Icon(
-                          Icons.radar_rounded,
-                          color: Colors.white70,
-                          size: 32,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildPrimaryActions() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final titleColor = isDark
         ? const Color(0xFFE5E7EB)
         : const Color(0xFF111827);
+    final surface = isDark ? const Color(0xFF1B251B) : Colors.white;
+    final borderColor = isDark
+        ? const Color(0xFF334236)
+        : const Color(0xFF2D5927).withAlpha(26);
+    final bodyColor = isDark
+        ? const Color(0xFFA7B5A8)
+        : const Color(0xFF64748B);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1147,53 +973,97 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         const SizedBox(height: 12),
-        GridView(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            mainAxisExtent: 90,
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: borderColor),
           ),
-          children: [
-            _buildPrimaryActionChip(
-              icon: Icons.checklist,
-              label: _tr(en: 'Checklist', ms: 'Senarai', zh: '清单'),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const DisasterChecklistPage(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _tr(
+                  en: 'Get to your most important tools quickly.',
+                  ms: 'Akses alat yang paling penting dengan cepat.',
+                  zh: '快速进入最重要的工具。',
                 ),
+                style: TextStyle(color: bodyColor, fontSize: 13, height: 1.35),
               ),
-            ),
-            _buildPrimaryActionChip(
-              icon: Icons.alt_route,
-              label: _tr(en: 'Safe Routes', ms: 'Laluan', zh: '安全路线'),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SafeRoutesPage()),
-              ),
-            ),
-            _buildPrimaryActionChip(
-              icon: Icons.school_outlined,
-              label: _tr(en: 'Learn', ms: 'Belajar', zh: '学习'),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const LearnPage()),
-              ),
-            ),
-            _buildPrimaryActionChip(
-              icon: Icons.local_phone_outlined,
-              label: _tr(en: 'SOS', ms: 'SOS', zh: '求助'),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const EmergencyContactsPage(),
+              const SizedBox(height: 14),
+              GridView(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  mainAxisExtent: 90,
                 ),
+                children: [
+                  _buildPrimaryActionChip(
+                    icon: Icons.checklist,
+                    label: _tr(en: 'Checklist', ms: 'Senarai', zh: '清单'),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const DisasterChecklistPage(),
+                      ),
+                    ),
+                  ),
+                  _buildPrimaryActionChip(
+                    icon: Icons.alt_route,
+                    label: _tr(en: 'Safe Routes', ms: 'Laluan', zh: '安全路线'),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SafeRoutesPage()),
+                    ),
+                  ),
+                  _buildPrimaryActionChip(
+                    icon: Icons.school_outlined,
+                    label: _tr(en: 'Learn', ms: 'Belajar', zh: '学习'),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LearnPage()),
+                    ),
+                  ),
+                  _buildPrimaryActionChip(
+                    icon: Icons.local_phone_outlined,
+                    label: _tr(en: 'SOS', ms: 'SOS', zh: '求助'),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const EmergencyContactsPage(),
+                      ),
+                    ),
+                  ),
+                  _buildPrimaryActionChip(
+                    icon: Icons.flag_outlined,
+                    label: _tr(en: 'New Report', ms: 'Laporan Baru', zh: '新报告'),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            SubmitReportPage(accessToken: widget.accessToken),
+                      ),
+                    ),
+                  ),
+                  _buildPrimaryActionChip(
+                    icon: Icons.group_outlined,
+                    label: _tr(en: 'My Family', ms: 'Keluarga', zh: '我的家人'),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            FamilyTab(accessToken: widget.accessToken),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
@@ -1218,31 +1088,35 @@ class _HomePageState extends State<HomePage> {
       child: InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(16),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: chipBg,
-                  borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(13),
+                  decoration: BoxDecoration(
+                    color: chipBg,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Icon(icon, size: 24, color: chipIcon),
                 ),
-                child: Icon(icon, size: 25, color: chipIcon),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: labelColor,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
+                const SizedBox(height: 8),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: labelColor,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    height: 1.2,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1467,9 +1341,12 @@ class _HomePageState extends State<HomePage> {
       case 0:
         return _buildDashboard();
       case 1:
-        return ReportsTab(accessToken: widget.accessToken);
+        return MapTab(accessToken: widget.accessToken);
       case 2:
-        return const MapTab();
+        return NotificationsTab(
+          accessToken: widget.accessToken,
+          warnings: _allActiveWarnings,
+        );
       case 3:
         return ProfileTab(
           accessToken: widget.accessToken,
@@ -1492,9 +1369,7 @@ class _HomePageState extends State<HomePage> {
             ? const [Color(0xFF9EDB94), Color(0xFFE3F3DF)]
             : const [Color(0xFF163A12), Color(0xFF2D5927)],
         letterSpacing: 1.0,
-        strokeColor: isDark
-            ? const Color(0x4D86C77C)
-            : const Color(0x991B3516),
+        strokeColor: isDark ? const Color(0x4D86C77C) : const Color(0x991B3516),
         strokeWidth: 0.9,
         withShadow: false,
         textAlign: TextAlign.left,
@@ -1504,9 +1379,9 @@ class _HomePageState extends State<HomePage> {
     String title;
     switch (_selectedIndex) {
       case 1:
-        title = _tr(en: 'Reports', ms: 'Laporan', zh: '报告');
-      case 2:
         title = _tr(en: 'Map', ms: 'Peta', zh: '地图');
+      case 2:
+        title = _tr(en: 'Notifications', ms: 'Notifikasi', zh: '通知');
       case 3:
         title = _tr(en: 'Profile', ms: 'Profil', zh: '个人');
       case 4:
@@ -1523,6 +1398,48 @@ class _HomePageState extends State<HomePage> {
         color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF111827),
       ),
     );
+  }
+
+  List<Widget>? _buildTopBarActions(bool isDark) {
+    if (_selectedIndex != 0) {
+      return null;
+    }
+
+    final chatTextColor = isDark
+        ? const Color(0xFFE5E7EB)
+        : const Color(0xFF163A12);
+    final chatBorder = isDark
+        ? const Color(0xFF3A4A3A)
+        : const Color(0xFFCEE4C8);
+
+    final actions = <Widget>[
+      Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: TextButton.icon(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ChatbotPage()),
+            );
+          },
+          style: TextButton.styleFrom(
+            foregroundColor: chatTextColor,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: BorderSide(color: chatBorder),
+            ),
+          ),
+          icon: const Icon(Icons.chat_bubble_rounded, size: 16),
+          label: const Text(
+            'LANDAi',
+            style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: 0.2),
+          ),
+        ),
+      ),
+    ];
+
+    return actions;
   }
 
   void _scrollHomeToTop() {
@@ -1548,36 +1465,49 @@ class _HomePageState extends State<HomePage> {
         : const Color(0xFF66726A);
 
     Widget navItem({required bool isSelected}) {
-      return SizedBox(
-        width: 88,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? (isDark
-                      ? const Color(0xFF2D5927).withAlpha(64)
-                      : navPrimary.withAlpha(18))
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                isSelected ? selectedIcon : icon,
-                size: 24,
-                color: isSelected ? navPrimary : navInactive,
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? navPrimary : navInactive,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
+      return Semantics(
+        button: true,
+        selected: isSelected,
+        label: label,
+        child: ExcludeSemantics(
+          child: SizedBox(
+            width: 72,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? (isDark
+                              ? const Color(0xFF2D5927).withAlpha(64)
+                              : navPrimary.withAlpha(18))
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Icon(
+                    isSelected ? selectedIcon : icon,
+                    size: 24,
+                    color: isSelected ? navPrimary : navInactive,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? navPrimary : navInactive,
+                    height: 1.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -1593,6 +1523,7 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isHomeTab = _selectedIndex == 0;
     final pageBg = isDark ? const Color(0xFF0F140F) : const Color(0xFFF0F2F5);
     final barBg = isDark ? const Color(0xFF1B251B) : Colors.white;
     final borderColor = isDark
@@ -1611,65 +1542,17 @@ class _HomePageState extends State<HomePage> {
         scrolledUnderElevation: 1,
         elevation: 0,
         shadowColor: Colors.transparent,
-        centerTitle: true,
-        titleSpacing: 0,
+        centerTitle: isHomeTab,
+        titleSpacing: isHomeTab ? 0 : 16,
         toolbarHeight: 64,
         title: _buildTopBarTitle(isDark),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: borderColor),
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: IconButton(
-              tooltip: _tr(en: 'Warnings', ms: 'Amaran', zh: '警报'),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => AllWarningsPage(warnings: _allActiveWarnings),
-                ),
-              ),
-              icon: Stack(
-                children: [
-                  const Icon(Icons.notifications_none_rounded),
-                  if (_nearbyWarnings.isNotEmpty)
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Colors.redAccent,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ],
+        actions: _buildTopBarActions(isDark),
       ),
       body: _buildBody(),
-      floatingActionButton: _selectedIndex == 0
-          ? FloatingActionButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ChatbotPage()),
-                );
-              },
-              backgroundColor: const Color(0xFF2E7D32),
-              tooltip: _tr(
-                en: 'Disaster Assistant',
-                ms: 'Pembantu Bencana',
-                zh: '灾害助手',
-              ),
-              child: const Icon(Icons.smart_toy_rounded, color: Colors.white),
-            )
-          : null,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: barBg,
@@ -1703,14 +1586,14 @@ class _HomePageState extends State<HomePage> {
               selectedIcon: Icons.home,
             ),
             _buildNavDestination(
-              label: _tr(en: 'Reports', ms: 'Laporan', zh: '报告'),
-              icon: Icons.insert_chart_outlined,
-              selectedIcon: Icons.insert_chart,
-            ),
-            _buildNavDestination(
               label: _tr(en: 'Map', ms: 'Peta', zh: '地图'),
               icon: Icons.map_outlined,
               selectedIcon: Icons.map,
+            ),
+            _buildNavDestination(
+              label: _tr(en: 'Notifications', ms: 'Notifikasi', zh: '通知'),
+              icon: Icons.notifications_none_rounded,
+              selectedIcon: Icons.notifications_rounded,
             ),
             _buildNavDestination(
               label: _tr(en: 'Profile', ms: 'Profil', zh: '个人'),

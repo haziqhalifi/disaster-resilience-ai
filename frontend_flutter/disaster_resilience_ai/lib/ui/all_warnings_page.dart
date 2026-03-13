@@ -1,11 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:disaster_resilience_ai/models/warning_model.dart';
 import 'package:disaster_resilience_ai/ui/emergency_alert_page.dart';
+import 'package:disaster_resilience_ai/utils/time_utils.dart';
 
 class AllWarningsPage extends StatelessWidget {
   final List<Warning> warnings;
 
   const AllWarningsPage({super.key, required this.warnings});
+
+  String _tr(
+    BuildContext context, {
+    required String en,
+    String? id,
+    required String ms,
+    required String zh,
+  }) {
+    switch (Localizations.localeOf(context).languageCode) {
+      case 'ms':
+        return ms;
+      case 'zh':
+        return zh;
+      case 'id':
+        return id ?? ms;
+      default:
+        return en;
+    }
+  }
+
+  String _warningCountLabel(BuildContext context, int count) {
+    return _tr(
+      context,
+      en: '$count warning${count == 1 ? '' : 's'} found',
+      id: '$count peringatan ditemukan',
+      ms: '$count amaran ditemui',
+      zh: '找到 $count 条警报',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +79,13 @@ class AllWarningsPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Active Warnings',
+              _tr(
+                context,
+                en: 'Active Warnings',
+                id: 'Peringatan Aktif',
+                ms: 'Amaran Aktif',
+                zh: '当前警报',
+              ),
               style: TextStyle(
                 color: titleColor,
                 fontWeight: FontWeight.bold,
@@ -57,8 +93,8 @@ class AllWarningsPage extends StatelessWidget {
               ),
             ),
             Text(
-              '${sorted.length} warning${sorted.length == 1 ? '' : 's'} found',
-              style: TextStyle(color: subtitleColor, fontSize: 12),
+              _warningCountLabel(context, sorted.length),
+              style: TextStyle(color: subtitleColor, fontSize: 13),
             ),
           ],
         ),
@@ -67,41 +103,112 @@ class AllWarningsPage extends StatelessWidget {
           child: Container(height: 1, color: dividerColor),
         ),
       ),
-      body: sorted.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.check_circle_outline,
-                    color: isDark
-                        ? const Color(0xFF86C77C)
-                        : const Color(0xFF4CAF50),
-                    size: 64,
+      body: Column(
+        children: [
+          // ── Warning level legend ──────────────────────────────────────
+          Container(
+            color: isDark ? const Color(0xFF1B251B) : Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                _legendDot(
+                  isDark ? const Color(0xFF93C5FD) : Colors.blue[600]!,
+                  _tr(
+                    context,
+                    en: 'Advisory',
+                    id: 'Imbauan',
+                    ms: 'Nasihat',
+                    zh: '提示',
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No Active Warnings',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: titleColor,
-                    ),
+                ),
+                _legendDot(
+                  isDark ? const Color(0xFFFCD34D) : Colors.amber[700]!,
+                  _tr(
+                    context,
+                    en: 'Observe',
+                    id: 'Pantau',
+                    ms: 'Pantau',
+                    zh: '观察',
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Your area is currently safe.',
-                    style: TextStyle(color: subtitleColor),
+                ),
+                _legendDot(
+                  isDark ? const Color(0xFFFDBA74) : Colors.orange[700]!,
+                  _tr(
+                    context,
+                    en: 'Warning',
+                    id: 'Peringatan',
+                    ms: 'Amaran',
+                    zh: '警告',
                   ),
-                ],
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: sorted.length,
-              itemBuilder: (context, index) =>
-                  _buildTile(context, sorted[index]),
+                ),
+                _legendDot(
+                  isDark ? const Color(0xFFFCA5A5) : Colors.red[700]!,
+                  _tr(
+                    context,
+                    en: 'Evacuate',
+                    id: 'Evakuasi',
+                    ms: 'Pindah',
+                    zh: '撤离',
+                  ),
+                ),
+              ],
             ),
+          ),
+          Container(height: 1, color: dividerColor),
+          // ── List ──────────────────────────────────────────────────────
+          Expanded(
+            child: sorted.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          color: isDark
+                              ? const Color(0xFF86C77C)
+                              : const Color(0xFF4CAF50),
+                          size: 64,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _tr(
+                            context,
+                            en: 'No Active Warnings',
+                            id: 'Tidak Ada Peringatan Aktif',
+                            ms: 'Tiada Amaran Aktif',
+                            zh: '当前没有警报',
+                          ),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: titleColor,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _tr(
+                            context,
+                            en: 'Your area is currently safe.',
+                            id: 'Area Anda saat ini aman.',
+                            ms: 'Kawasan anda kini selamat.',
+                            zh: '您所在区域目前安全。',
+                          ),
+                          style: TextStyle(color: subtitleColor, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: sorted.length,
+                    itemBuilder: (context, index) =>
+                        _buildTile(context, sorted[index]),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -145,66 +252,84 @@ class AllWarningsPage extends StatelessWidget {
     metaColor = isDark ? const Color(0xFFB8C2BA) : const Color(0xFF64748B);
     iconCardColor = isDark ? const Color(0xFF243124) : Colors.white;
 
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => EmergencyAlertPage(warning: warning),
+    return Material(
+      color: tileColor,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => EmergencyAlertPage(warning: warning),
+            ),
+          );
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: borderColor, width: 1.5),
           ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: tileColor,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: borderColor, width: 1.5),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: iconCardColor,
-                borderRadius: BorderRadius.circular(10),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: iconCardColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: iconColor, size: 24),
               ),
-              child: Icon(icon, color: iconColor, size: 24),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    warning.title,
-                    style: TextStyle(
-                      color: titleColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      warning.title,
+                      style: TextStyle(
+                        color: titleColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${warning.hazardType.displayName} • ${warning.alertLevel.displayName} • ${_timeAgo(warning.createdAt)}',
-                    style: TextStyle(color: metaColor, fontSize: 12),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      '${warning.hazardType.displayName} • ${warning.alertLevel.displayName} • ${localizedTimeAgo(warning.createdAt, context)}',
+                      style: TextStyle(color: metaColor, fontSize: 13),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Icon(Icons.chevron_right, color: iconColor),
-          ],
+              Icon(Icons.chevron_right, color: iconColor),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  String _timeAgo(DateTime dt) {
-    final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    return '${diff.inDays}d ago';
+  Widget _legendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
   }
 }

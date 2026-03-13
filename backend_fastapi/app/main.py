@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.endpoints import (
-    admin, alerts, auth, devices, family, learn, preparedness,
+    admin, alerts, auth, chat, devices, family, learn, preparedness,
     profile, reports, risk_map, sirens, sms, warnings, weather,
 )
 from app.scheduler import start_scheduler, stop_scheduler
@@ -59,6 +59,7 @@ app.include_router(admin.router,         prefix="/api/v1/admin",          tags=[
 app.include_router(sms.router,           prefix="/api/v1/sms",            tags=["sms"])
 app.include_router(sirens.router,        prefix="/api/v1/sirens",         tags=["sirens"])
 app.include_router(learn.router,         prefix="/api/v1/learn",          tags=["learn"])
+app.include_router(chat.router,          prefix="/api/v1/chat",           tags=["chat"])
 app.include_router(weather.router,       prefix="/api/v1/weather",        tags=["weather"])
 
 

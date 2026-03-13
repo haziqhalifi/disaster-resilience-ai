@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:disaster_resilience_ai/models/profile_model.dart';
@@ -9,6 +10,8 @@ import 'package:disaster_resilience_ai/services/notification_service.dart';
 import 'package:disaster_resilience_ai/services/weather_service.dart';
 import 'package:disaster_resilience_ai/ui/edit_profile_page.dart';
 import 'package:disaster_resilience_ai/ui/family_tab.dart';
+import 'package:disaster_resilience_ai/ui/my_submissions_page.dart';
+import 'package:disaster_resilience_ai/utils/accessibility_settings.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({
@@ -29,15 +32,26 @@ class ProfileTab extends StatefulWidget {
 }
 
 class _ProfileTabState extends State<ProfileTab> {
+  static const _notificationsPrefKey = 'notifications_enabled';
+
   final ApiService _api = ApiService();
   final WeatherService _weatherService = WeatherService();
   UserProfile? _profile;
   bool _loading = true;
+  bool _uploadingProfilePhoto = false;
   String? _error;
   bool _notificationsEnabled = true;
+  bool _largeTextEnabled = false;
+  bool _reducedMotionEnabled = false;
+  bool _hapticOnlyAlertsEnabled = false;
   String? _savedPhone; // phone stored in devices table
   String _locationLabel = 'Locating...';
+  double _currentLat = 3.8077;
+  double _currentLon = 103.3260;
   double _preparednessProgress = 0.0;
+  List<Map<String, dynamic>> _myReports = [];
+
+  bool _loadingMyReports = true;
 
   static const List<String> _checklistIds = [
     'b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7',
@@ -49,9 +63,53 @@ class _ProfileTabState extends State<ProfileTab> {
   void initState() {
     super.initState();
     _fetchProfile();
+    _loadNotificationPreference();
+    _loadAccessibilitySettings();
     _fetchSavedPhone();
     _fetchCurrentLocation();
     _loadPreparedness();
+    _loadMyReports();
+  }
+
+  Future<void> _loadAccessibilitySettings() async {
+    final settings = await AccessibilitySettings.load();
+    if (!mounted) return;
+    setState(() {
+      _largeTextEnabled = settings.largeTextEnabled;
+      _reducedMotionEnabled = settings.reducedMotionEnabled;
+      _hapticOnlyAlertsEnabled = settings.hapticOnlyAlertsEnabled;
+    });
+  }
+
+  Future<void> _loadNotificationPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _notificationsEnabled = prefs.getBool(_notificationsPrefKey) ?? true;
+    });
+  }
+
+  Future<void> _loadMyReports() async {
+    if (widget.accessToken.isEmpty) {
+      if (mounted) setState(() => _loadingMyReports = false);
+      return;
+    }
+    try {
+      final payload = await _api.fetchMyReports(
+        accessToken: widget.accessToken,
+      );
+      final rows = (payload['reports'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .toList();
+      if (mounted) {
+        setState(() {
+          _myReports = rows;
+          _loadingMyReports = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingMyReports = false);
+    }
   }
 
   Future<void> _fetchSavedPhone() async {
@@ -155,14 +213,62 @@ class _ProfileTabState extends State<ProfileTab> {
       final place = await _weatherService.fetchLocationName(latitude: lat, longitude: lon);
       if (!mounted) return;
       setState(() {
+        _currentLat = lat;
+        _currentLon = lon;
         _locationLabel = (place != null && place.isNotEmpty)
             ? place
             : 'Near ${lat.toStringAsFixed(4)}, ${lon.toStringAsFixed(4)}';
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() { _locationLabel = 'Location unavailable'; });
+      setState(() {
+        _locationLabel = 'Location unavailable';
+      });
     }
+  }
+
+  Future<void> _setNotificationsEnabled(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_notificationsPrefKey, value);
+
+    if (value) {
+      NotificationService.instance.startPolling(
+        accessToken: widget.accessToken,
+        latitude: _currentLat,
+        longitude: _currentLon,
+      );
+    } else {
+      NotificationService.instance.stopPolling();
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _notificationsEnabled = value;
+    });
+  }
+
+  Future<void> _setLargeTextEnabled(bool value) async {
+    await AccessibilitySettings.setLargeTextEnabled(value);
+    if (!mounted) return;
+    setState(() {
+      _largeTextEnabled = value;
+    });
+  }
+
+  Future<void> _setReducedMotionEnabled(bool value) async {
+    await AccessibilitySettings.setReducedMotionEnabled(value);
+    if (!mounted) return;
+    setState(() {
+      _reducedMotionEnabled = value;
+    });
+  }
+
+  Future<void> _setHapticOnlyAlertsEnabled(bool value) async {
+    await AccessibilitySettings.setHapticOnlyAlertsEnabled(value);
+    if (!mounted) return;
+    setState(() {
+      _hapticOnlyAlertsEnabled = value;
+    });
   }
 
   Future<void> _selectLanguage() async {
@@ -192,6 +298,15 @@ class _ProfileTabState extends State<ProfileTab> {
         final checkColor = isDark
             ? const Color(0xFFD1D5DB)
             : const Color(0xFF475569);
+        final comingSoonBg = isDark
+            ? const Color(0xFF1B251B)
+            : const Color(0xFFF8FAFC);
+        final comingSoonBorder = isDark
+            ? const Color(0xFF334236)
+            : const Color(0xFFE2E8F0);
+        final comingSoonTitle = isDark
+            ? const Color(0xFFE5E7EB)
+            : const Color(0xFF0F172A);
         return SafeArea(
           child: ListView(
             shrinkWrap: true,
@@ -219,6 +334,70 @@ class _ProfileTabState extends State<ProfileTab> {
                   onTap: () => Navigator.pop(context, lang),
                 );
               }),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: comingSoonBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: comingSoonBorder),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2E7D32).withAlpha(26),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFF2E7D32),
+                              ),
+                            ),
+                            child: const Text(
+                              'ASEAN-Ready',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF2E7D32),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              tr(
+                                en: 'More languages coming soon',
+                                ms: 'Lebih banyak bahasa akan datang',
+                                zh: '更多语言即将推出',
+                              ),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: comingSoonTitle,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        tr(
+                          en: 'Thai, Vietnamese, Filipino (Tagalog), Khmer, Lao, Burmese, and more.',
+                          ms: 'Bahasa Thai, Vietnam, Filipina (Tagalog), Khmer, Lao, Burma dan lain-lain.',
+                          zh: '泰语、越南语、菲律宾语（他加禄语）、高棉语、老挝语、缅甸语等。',
+                        ),
+                        style: TextStyle(color: subtitleColor, height: 1.35),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: 8),
             ],
           ),
@@ -267,6 +446,121 @@ class _ProfileTabState extends State<ProfileTab> {
 
     if (result == true) {
       _fetchProfile();
+    }
+  }
+
+  Future<void> _showProfileActions() async {
+    final tr = AppLanguageScope.tr;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: Text(
+                  tr(
+                    ctx,
+                    en: 'Upload Profile Photo',
+                    ms: 'Muat Naik Foto Profil',
+                    zh: '上传头像照片',
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickAndUploadProfilePhoto();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: Text(
+                  tr(
+                    ctx,
+                    en: 'Edit Profile Details',
+                    ms: 'Sunting Butiran Profil',
+                    zh: '编辑个人资料详情',
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _editProfile();
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAndUploadProfilePhoto() async {
+    if (_uploadingProfilePhoto) return;
+    setState(() => _uploadingProfilePhoto = true);
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+        withData: true,
+      );
+      if (picked == null || picked.files.isEmpty) {
+        return;
+      }
+
+      final file = picked.files.first;
+      final bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        throw Exception('Unable to read selected image');
+      }
+
+      final fileName = file.name.isNotEmpty ? file.name : 'profile-photo.jpg';
+      final lower = fileName.toLowerCase();
+      final contentType = lower.endsWith('.png')
+          ? 'image/png'
+          : lower.endsWith('.webp')
+          ? 'image/webp'
+          : 'image/jpeg';
+
+      await _api.uploadProfilePhoto(
+        accessToken: widget.accessToken,
+        bytes: bytes,
+        filename: fileName,
+        contentType: contentType,
+      );
+
+      await _fetchProfile();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLanguageScope.tr(
+              context,
+              en: 'Profile photo updated successfully.',
+              ms: 'Foto profil berjaya dikemas kini.',
+              zh: '头像照片更新成功。',
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLanguageScope.tr(
+              context,
+              en: 'Unable to upload profile photo: $e',
+              ms: 'Tidak dapat memuat naik foto profil: $e',
+              zh: '无法上传头像照片：$e',
+            ),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _uploadingProfilePhoto = false);
     }
   }
 
@@ -564,10 +858,10 @@ class _ProfileTabState extends State<ProfileTab> {
                                           .trim(),
                                     },
                                   );
-                                  if (!mounted) return;
+                                  if (!ctx.mounted) return;
                                   Navigator.pop(ctx);
                                   await _fetchProfile();
-                                  if (!mounted) return;
+                                  if (!context.mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -581,7 +875,7 @@ class _ProfileTabState extends State<ProfileTab> {
                                     ),
                                   );
                                 } catch (e) {
-                                  if (!mounted) return;
+                                  if (!context.mounted) return;
                                   setSheetState(() => saving = false);
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
@@ -663,24 +957,18 @@ class _ProfileTabState extends State<ProfileTab> {
     final tertiaryText = isDark
         ? const Color(0xFF8A9A8B)
         : const Color(0xFF94A3B8);
-    final locationAccent = isDark
-        ? const Color(0xFF9EDB94)
-        : primary;
+    final locationAccent = isDark ? const Color(0xFF9EDB94) : primary;
     final idChipBg = isDark
         ? const Color(0xFF2D5927).withAlpha(72)
         : primary.withAlpha(22);
-    final editButtonColor = isDark
-        ? const Color(0xFF9EDB94)
-        : primary;
+    final editButtonColor = isDark ? const Color(0xFF9EDB94) : primary;
     final editButtonBg = isDark
         ? const Color(0xFF2D5927).withAlpha(56)
         : primary.withAlpha(14);
     final switchActiveTrack = isDark
         ? const Color(0xFF3E7041)
         : primary.withAlpha(120);
-    final switchActiveThumb = isDark
-        ? const Color(0xFFBEEAB6)
-        : primary;
+    final switchActiveThumb = isDark ? const Color(0xFFBEEAB6) : primary;
     final switchInactiveTrack = isDark
         ? const Color(0xFF3A463A)
         : const Color(0xFFE2E8F0);
@@ -744,6 +1032,7 @@ class _ProfileTabState extends State<ProfileTab> {
     final preparednessPercent = (_preparednessProgress * 100).round();
     final landaId =
         'RAI-${profile.userId.replaceAll(RegExp(r'[^0-9A-Za-z]'), '').toUpperCase().padLeft(4, '0').substring(0, 4)}';
+    final hasProfilePhoto = profile.profilePhotoUrl?.isNotEmpty ?? false;
 
     return Scaffold(
       backgroundColor: pageBg,
@@ -770,23 +1059,59 @@ class _ProfileTabState extends State<ProfileTab> {
                         child: CircleAvatar(
                           radius: 50,
                           backgroundColor: const Color(0xFFE6EFE5),
-                          child: Text(
-                            widget.username.isNotEmpty
-                                ? widget.username[0].toUpperCase()
-                                : 'U',
-                            style: const TextStyle(
-                              color: primary,
-                              fontSize: 38,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          backgroundImage: hasProfilePhoto
+                              ? NetworkImage(profile.profilePhotoUrl!)
+                              : null,
+                          onBackgroundImageError: hasProfilePhoto
+                              ? (exception, stackTrace) {
+                                  // Fall back to initials when image fails to load.
+                                  if (!mounted) return;
+                                  final currentUrl = _profile?.profilePhotoUrl;
+                                  if (currentUrl == null ||
+                                      currentUrl.isEmpty) {
+                                    return;
+                                  }
+                                  final safeProfile = _profile;
+                                  if (safeProfile == null) return;
+                                  setState(() {
+                                    _profile = UserProfile(
+                                      userId: safeProfile.userId,
+                                      fullName: safeProfile.fullName,
+                                      phoneNumber: safeProfile.phoneNumber,
+                                      bloodType: safeProfile.bloodType,
+                                      profilePhotoUrl: null,
+                                      allergies: safeProfile.allergies,
+                                      medicalConditions:
+                                          safeProfile.medicalConditions,
+                                      emergencyContactName:
+                                          safeProfile.emergencyContactName,
+                                      emergencyContactRelationship: safeProfile
+                                          .emergencyContactRelationship,
+                                      emergencyContactPhone:
+                                          safeProfile.emergencyContactPhone,
+                                    );
+                                  });
+                                }
+                              : null,
+                          child: hasProfilePhoto
+                              ? null
+                              : Text(
+                                  widget.username.isNotEmpty
+                                      ? widget.username[0].toUpperCase()
+                                      : 'U',
+                                  style: const TextStyle(
+                                    color: primary,
+                                    fontSize: 38,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                         ),
                       ),
                       Positioned(
                         right: 2,
                         bottom: 2,
                         child: InkWell(
-                          onTap: _editProfile,
+                          onTap: _showProfileActions,
                           borderRadius: BorderRadius.circular(20),
                           child: Container(
                             padding: const EdgeInsets.all(7),
@@ -794,11 +1119,20 @@ class _ProfileTabState extends State<ProfileTab> {
                               color: primary,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
-                              Icons.edit,
-                              color: Colors.white,
-                              size: 14,
-                            ),
+                            child: _uploadingProfilePhoto
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.camera_alt,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
                           ),
                         ),
                       ),
@@ -817,11 +1151,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.location_on,
-                        size: 15,
-                        color: locationAccent,
-                      ),
+                      Icon(Icons.location_on, size: 15, color: locationAccent),
                       const SizedBox(width: 4),
                       Flexible(
                         child: Text(
@@ -862,148 +1192,160 @@ class _ProfileTabState extends State<ProfileTab> {
               ),
             ),
             const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: surface,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tr(
+                      en: 'Safety Overview',
+                      ms: 'Ringkasan Keselamatan',
+                      zh: '安全概览',
+                    ),
+                    style: TextStyle(
+                      color: secondaryText,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.verified, color: primary, size: 16),
+                                const SizedBox(width: 6),
+                                Text(
+                                  tr(
+                                    en: 'Preparedness',
+                                    ms: 'Kesiapsiagaan',
+                                    zh: '应急准备',
+                                  ),
+                                  style: TextStyle(
+                                    color: secondaryText,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '$preparednessPercent%',
+                              style: TextStyle(
+                                color: isDark
+                                    ? const Color(0xFFE5E7EB)
+                                    : const Color(0xFF111827),
+                                fontSize: 24,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              tr(
+                                en: '$preparednessDone/${_checklistIds.length} completed',
+                                ms: '$preparednessDone/${_checklistIds.length} selesai',
+                                zh: '已完成 $preparednessDone/${_checklistIds.length}',
+                              ),
+                              style: TextStyle(
+                                color: tertiaryText,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 64,
+                        color: border,
+                        margin: const EdgeInsets.symmetric(horizontal: 14),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.emergency, color: primary, size: 16),
+                                const SizedBox(width: 6),
+                                Text(
+                                  tr(en: 'Contacts', ms: 'Kenalan', zh: '联系人'),
+                                  style: TextStyle(
+                                    color: secondaryText,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              hasEmergencyContact
+                                  ? tr(
+                                      en: '1 Active',
+                                      ms: '1 Aktif',
+                                      zh: '1 个已设置',
+                                    )
+                                  : tr(
+                                      en: 'Not Set',
+                                      ms: 'Belum Ditetapkan',
+                                      zh: '未设置',
+                                    ),
+                              style: TextStyle(
+                                color: isDark
+                                    ? const Color(0xFFE5E7EB)
+                                    : const Color(0xFF111827),
+                                fontSize: 24,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              hasEmergencyContact
+                                  ? tr(
+                                      en: 'Saved on your safety profile',
+                                      ms: 'Disimpan dalam profil keselamatan anda',
+                                      zh: '已保存到您的安全资料',
+                                    )
+                                  : tr(
+                                      en: 'Add emergency contact',
+                                      ms: 'Tambah kenalan kecemasan',
+                                      zh: '添加紧急联系人',
+                                    ),
+                              style: TextStyle(
+                                color: tertiaryText,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: _preparednessProgress,
+                      minHeight: 6,
                       color: primary,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: primary.withAlpha(46),
-                          blurRadius: 16,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                tr(
-                                  en: 'Preparedness',
-                                  ms: 'Kesiapsiagaan',
-                                  zh: '应急准备',
-                                ),
-                                style: const TextStyle(
-                                  color: Color(0xCCE8F5E9),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            const Icon(
-                              Icons.verified,
-                              color: Colors.white,
-                              size: 14,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '$preparednessPercent%',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          tr(
-                            en:
-                                '$preparednessDone/${_checklistIds.length} completed',
-                            ms:
-                                '$preparednessDone/${_checklistIds.length} selesai',
-                            zh:
-                                '已完成 $preparednessDone/${_checklistIds.length}',
-                          ),
-                          style: const TextStyle(
-                            color: Color(0xCCE8F5E9),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(999),
-                          child: LinearProgressIndicator(
-                            value: _preparednessProgress,
-                            minHeight: 5,
-                            color: Colors.white,
-                            backgroundColor: Colors.white24,
-                          ),
-                        ),
-                      ],
+                      backgroundColor: subtleSurface,
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: border),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                tr(en: 'Contacts', ms: 'Kenalan', zh: '联系人'),
-                                style: TextStyle(
-                                  color: secondaryText,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            Icon(Icons.emergency, color: primary, size: 14),
-                          ],
-                        ),
-                        SizedBox(height: 6),
-                        Text(
-                          hasEmergencyContact
-                              ? tr(en: '1 Active', ms: '1 Aktif', zh: '1 个已设置')
-                              : tr(
-                                  en: 'Not Set',
-                                  ms: 'Belum Ditetapkan',
-                                  zh: '未设置',
-                                ),
-                          style: TextStyle(
-                            fontSize: 23,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          hasEmergencyContact
-                              ? tr(
-                                  en: 'Last verified: 2 days ago',
-                                  ms: 'Terakhir disahkan: 2 hari lalu',
-                                  zh: '最近验证：2 天前',
-                                )
-                              : tr(
-                                  en: 'Add emergency contact',
-                                  ms: 'Tambah kenalan kecemasan',
-                                  zh: '添加紧急联系人',
-                                ),
-                          style: TextStyle(color: tertiaryText, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: 24),
             Row(
@@ -1028,11 +1370,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     color: editButtonColor,
                   ),
                   label: Text(
-                    tr(
-                      en: 'Edit Profile',
-                      ms: 'Sunting Profil',
-                      zh: '编辑个人资料',
-                    ),
+                    tr(en: 'Manage Contact', ms: 'Urus Kenalan', zh: '管理联系人'),
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
                       color: editButtonColor,
@@ -1089,12 +1427,46 @@ class _ProfileTabState extends State<ProfileTab> {
               tertiaryText: tertiaryText,
               onTap: _showCommunityCenterForm,
             ),
+            const SizedBox(height: 24),
+            _buildSettingItem(
+              tr(en: 'My Submissions', ms: 'Penghantaran Saya', zh: '我的提交'),
+              icon: Icons.flag_outlined,
+              subtitle: _loadingMyReports
+                  ? tr(
+                      en: 'Loading your reports...',
+                      ms: 'Memuatkan laporan anda...',
+                      zh: '正在加载您的提交...',
+                    )
+                  : _myReports.isEmpty
+                  ? tr(
+                      en: 'No submissions yet',
+                      ms: 'Tiada penghantaran lagi',
+                      zh: '暂无提交',
+                    )
+                  : tr(
+                      en: '${_myReports.length} report(s)',
+                      ms: '${_myReports.length} laporan',
+                      zh: '${_myReports.length} 条提交',
+                    ),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        MySubmissionsPage(accessToken: widget.accessToken),
+                  ),
+                );
+              },
+            ),
             const SizedBox(height: 14),
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 tr(en: 'Settings', ms: 'Tetapan', zh: '设置'),
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -1109,7 +1481,8 @@ class _ProfileTabState extends State<ProfileTab> {
             _buildSettingItem(
               tr(en: 'Language', ms: 'Bahasa', zh: '语言'),
               icon: Icons.translate,
-              subtitle: languageController.label,
+              subtitle:
+                  '${languageController.label}  ·  ${tr(en: "ASEAN-Ready", ms: "Sedia ASEAN", zh: "东盟就绪")}  🇲🇾 🇮🇩 🇺🇸 🇨🇳',
               onTap: _selectLanguage,
             ),
             _buildSettingItem(
@@ -1117,8 +1490,7 @@ class _ProfileTabState extends State<ProfileTab> {
               icon: Icons.notifications,
               trailing: Switch(
                 value: _notificationsEnabled,
-                onChanged: (value) =>
-                    setState(() => _notificationsEnabled = value),
+                onChanged: _setNotificationsEnabled,
                 thumbColor: WidgetStateProperty.resolveWith((states) =>
                     states.contains(WidgetState.selected) ? switchActiveThumb : switchInactiveThumb),
                 trackColor: WidgetStateProperty.resolveWith((states) =>
@@ -1129,11 +1501,26 @@ class _ProfileTabState extends State<ProfileTab> {
               tr(en: 'Test Notification', ms: 'Uji Pemberitahuan', zh: '测试通知'),
               icon: Icons.notifications_active_outlined,
               subtitle: tr(
-                en: 'Send a test alert to verify notifications work',
-                ms: 'Hantar amaran ujian untuk sahkan pemberitahuan',
-                zh: '发送测试提醒以验证通知功能',
+                en: 'Send a test alert after enabling notifications',
+                ms: 'Hantar amaran ujian selepas mengaktifkan pemberitahuan',
+                zh: '启用通知后发送测试提醒',
               ),
               onTap: () async {
+                if (!_notificationsEnabled) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        tr(
+                          en: 'Enable notifications first to run a test alert',
+                          ms: 'Aktifkan pemberitahuan dahulu untuk menjalankan amaran ujian',
+                          zh: '请先启用通知再发送测试提醒',
+                        ),
+                      ),
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                  return;
+                }
                 try {
                   await NotificationService.instance.showTestNotification(
                     title: tr(
@@ -1195,6 +1582,73 @@ class _ProfileTabState extends State<ProfileTab> {
                 );
               },
             ),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                tr(en: 'Accessibility', ms: 'Kebolehcapaian', zh: '无障碍'),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildSettingItem(
+              tr(en: 'Large text', ms: 'Teks besar', zh: '大号字体'),
+              icon: Icons.text_increase,
+              subtitle: tr(
+                en: 'Increase readability across the app',
+                ms: 'Tingkatkan kebolehbacaan di seluruh aplikasi',
+                zh: '提高整个应用的可读性',
+              ),
+              trailing: Switch(
+                value: _largeTextEnabled,
+                onChanged: _setLargeTextEnabled,
+                activeTrackColor: switchActiveTrack,
+                activeThumbColor: switchActiveThumb,
+                inactiveTrackColor: switchInactiveTrack,
+                inactiveThumbColor: switchInactiveThumb,
+              ),
+            ),
+            _buildSettingItem(
+              tr(en: 'Reduce motion', ms: 'Kurangkan animasi', zh: '减少动态效果'),
+              icon: Icons.motion_photos_off_outlined,
+              subtitle: tr(
+                en: 'Limit pulse and movement on emergency screens',
+                ms: 'Hadkan kesan berdenyut dan pergerakan pada skrin kecemasan',
+                zh: '减少紧急页面的闪烁与移动效果',
+              ),
+              trailing: Switch(
+                value: _reducedMotionEnabled,
+                onChanged: _setReducedMotionEnabled,
+                activeTrackColor: switchActiveTrack,
+                activeThumbColor: switchActiveThumb,
+                inactiveTrackColor: switchInactiveTrack,
+                inactiveThumbColor: switchInactiveThumb,
+              ),
+            ),
+            _buildSettingItem(
+              tr(
+                en: 'Haptic-only emergency alerts',
+                ms: 'Amaran kecemasan haptik sahaja',
+                zh: '仅震动紧急警报',
+              ),
+              icon: Icons.vibration,
+              subtitle: tr(
+                en: 'Use vibration without alarm sound',
+                ms: 'Gunakan getaran tanpa bunyi penggera',
+                zh: '仅使用震动，不播放警报声',
+              ),
+              trailing: Switch(
+                value: _hapticOnlyAlertsEnabled,
+                onChanged: _setHapticOnlyAlertsEnabled,
+                activeTrackColor: switchActiveTrack,
+                activeThumbColor: switchActiveThumb,
+                inactiveTrackColor: switchInactiveTrack,
+                inactiveThumbColor: switchInactiveThumb,
+              ),
+            ),
             _buildSettingItem(
               tr(en: 'Dark Mode', ms: 'Mod Gelap', zh: '深色模式'),
               icon: Icons.dark_mode,
@@ -1209,30 +1663,10 @@ class _ProfileTabState extends State<ProfileTab> {
                     states.contains(WidgetState.selected) ? switchActiveTrack : switchInactiveTrack),
               ),
             ),
-            const SizedBox(height: 8),
-            InkWell(
+            _buildDangerOptionItem(
+              tr(en: 'Log Out', ms: 'Log Keluar', zh: '退出登录'),
+              icon: Icons.logout,
               onTap: widget.onLogout,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 14,
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.logout, color: Color(0xFFDC2626)),
-                    const SizedBox(width: 10),
-                    Text(
-                      tr(en: 'Log Out', ms: 'Log Keluar', zh: '退出登录'),
-                      style: const TextStyle(
-                        color: Color(0xFFDC2626),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ],
         ),
@@ -1311,6 +1745,11 @@ class _ProfileTabState extends State<ProfileTab> {
     VoidCallback? onTap,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? const Color(0xFF1B251B) : Colors.white;
+    final border = isDark ? const Color(0xFF334236) : const Color(0xFFE2E8F0);
+    final subtleSurface = isDark
+        ? const Color(0xFF233124)
+        : const Color(0xFFF1F5F9);
     final iconColor = isDark
         ? const Color(0xFFA7B5A8)
         : const Color(0xFF475569);
@@ -1321,36 +1760,109 @@ class _ProfileTabState extends State<ProfileTab> {
         ? const Color(0xFF8A9A8B)
         : const Color(0xFF94A3B8);
 
-    return InkWell(
-      onTap: onTap ?? (trailing == null ? _editProfile : null),
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        child: Row(
-          children: [
-            Icon(icon, color: iconColor, size: 21),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap ?? (trailing == null ? _editProfile : null),
+          borderRadius: BorderRadius.circular(12),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: border),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: subtleSurface,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Icon(icon, color: iconColor, size: 19),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (subtitle != null)
+                        Text(
+                          subtitle,
+                          style: TextStyle(fontSize: 12, color: subtitleColor),
+                        ),
+                    ],
+                  ),
+                ),
+                trailing ?? Icon(Icons.chevron_right, color: tertiaryText),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDangerOptionItem(
+    String title, {
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final border = isDark ? const Color(0xFF4A2A2A) : const Color(0xFFFECACA);
+    final bg = isDark ? const Color(0xFF2A1B1B) : const Color(0xFFFFF1F2);
+    const fg = Color(0xFFDC2626);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: border),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: fg.withAlpha(24),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Icon(Icons.logout, color: fg, size: 19),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
                     title,
                     style: const TextStyle(
+                      color: fg,
                       fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  if (subtitle != null)
-                    Text(
-                      subtitle,
-                      style: TextStyle(fontSize: 12, color: subtitleColor),
-                    ),
-                ],
-              ),
+                ),
+              ],
             ),
-            trailing ?? Icon(Icons.chevron_right, color: tertiaryText),
-          ],
+          ),
         ),
       ),
     );

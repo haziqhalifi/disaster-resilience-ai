@@ -15,6 +15,7 @@ from app.db import dun_boundaries as dunboundary_db
 from app.api.v1.dependencies import get_current_user
 from app.db import district_boundaries as dboundary_db
 from app.db import risk_zones as rz_db
+from app.services import nadma
 from app.schemas.risk_map import (
     AdminAreaOut,
     EvacuationCentreCreate,
@@ -24,6 +25,7 @@ from app.schemas.risk_map import (
     EvacuationRouteList,
     EvacuationRouteOut,
     MapDataResponse,
+    OfficialDisasterOut,
     RiskZoneCreate,
     RiskZoneList,
     RiskZoneOut,
@@ -197,6 +199,7 @@ async def get_map_data(
     zones = rz_db.list_risk_zones(active_only=True, hazard_type=hazard_type)
     centres = rz_db.list_evacuation_centres(active_only=True)
     routes = rz_db.list_evacuation_routes(active_only=True)
+    official_disasters = await nadma.get_active_disasters(hazard_type=hazard_type)
     boundaries = _load_admin_boundaries()
     area_hazards = [hazard_type] if hazard_type else ["flood", "landslide"]
     admin_areas: list[AdminAreaOut] = []
@@ -208,6 +211,7 @@ async def get_map_data(
         evacuation_centres=[_centre_to_out(c) for c in centres],
         evacuation_routes=[_route_to_out(r) for r in routes],
         admin_areas=admin_areas,
+        official_disasters=[OfficialDisasterOut(**d) for d in official_disasters],
     )
 
 

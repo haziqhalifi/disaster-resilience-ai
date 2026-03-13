@@ -6,6 +6,7 @@ class UserProfile {
   final String? fullName;
   final String? phoneNumber;
   final String? bloodType;
+  final String? profilePhotoUrl;
   final String allergies;
   final String medicalConditions;
   final String? emergencyContactName;
@@ -17,6 +18,7 @@ class UserProfile {
     this.fullName,
     this.phoneNumber,
     this.bloodType,
+    this.profilePhotoUrl,
     this.allergies = '',
     this.medicalConditions = '',
     this.emergencyContactName,
@@ -30,6 +32,7 @@ class UserProfile {
       fullName: json['full_name'] as String?,
       phoneNumber: json['phone_number'] as String?,
       bloodType: json['blood_type'] as String?,
+      profilePhotoUrl: json['profile_photo_url'] as String?,
       allergies: json['allergies'] as String? ?? '',
       medicalConditions: json['medical_conditions'] as String? ?? '',
       emergencyContactName: json['emergency_contact_name'] as String?,
@@ -44,6 +47,7 @@ class UserProfile {
       'full_name': fullName,
       'phone_number': phoneNumber,
       'blood_type': bloodType,
+      'profile_photo_url': profilePhotoUrl,
       'allergies': allergies,
       'medical_conditions': medicalConditions,
       'emergency_contact_name': emergencyContactName,

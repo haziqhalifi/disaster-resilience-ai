@@ -70,6 +70,18 @@ SAMPLE_WARNINGS = [
         "radius_km": 4.0,
         "source": "DID Malaysia",
     },
+    {
+        "title": "Flood Alert: Kampung Sungai Besar",
+        "description": "Rising water levels affecting Kampung Sungai Besar and surrounding low-lying "
+                       "areas. Residents are advised to move valuables to higher ground and monitor "
+                       "JPS updates. PPS Dewan Orang Ramai Sungai Besar is open for evacuees.",
+        "hazard_type": "flood",
+        "alert_level": "warning",
+        "latitude": 3.6818,
+        "longitude": 100.9930,
+        "radius_km": 4.0,
+        "source": "DID Malaysia",
+    },
 ]
 
 

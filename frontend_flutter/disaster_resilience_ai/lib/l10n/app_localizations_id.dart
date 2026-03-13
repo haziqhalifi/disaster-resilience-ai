@@ -50,4 +50,10 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get mapHazardGeneric => 'Bahaya';
+
+  @override
+  String get mapFilterAll => 'Semua';
+
+  @override
+  String get mapLegendCommunityReports => 'Laporan Komunitas';
 }

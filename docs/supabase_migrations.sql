@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
     full_name                      TEXT,
     phone_number                   TEXT,
     blood_type                     TEXT,
+    profile_photo_url              TEXT,
     allergies                      TEXT NOT NULL DEFAULT '',
     medical_conditions             TEXT NOT NULL DEFAULT '',
     emergency_contact_name         TEXT,

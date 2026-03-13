@@ -32,6 +32,7 @@ class _ReportsTabState extends State<ReportsTab> {
   double _currentLon = 103.3260;
   String _locationName = 'My Location';
   bool _isCurrentLocation = true;
+  final Set<String> _vouchingIds = <String>{};
 
   // Safety banner — shown when a flood report is within 10km
   List<dynamic> _nearbyFloodReports = [];
@@ -137,6 +138,7 @@ class _ReportsTabState extends State<ReportsTab> {
         latitude: _userLat,
         longitude: _userLon,
         radiusKm: 50,
+<<<<<<< HEAD
         statusFilter: 'pending,validated',
       );
       final rows = (payload['reports'] as List<dynamic>? ?? const []);
@@ -267,6 +269,8 @@ class _ReportsTabState extends State<ReportsTab> {
       imageUrl: mediaUrls.isNotEmpty ? mediaUrls.first : null,
       userVouched: row['current_user_vouched'] == true,
       vouchCount: (row['vouch_count'] as num?)?.toInt() ?? 0,
+      confidenceScore: (row['confidence_score'] as num?)?.toDouble(),
+      vulnerablePerson: row['vulnerable_person'] == true,
     );
   }
 
@@ -496,6 +500,46 @@ class _ReportsTabState extends State<ReportsTab> {
     return '${diff.inDays} days ago';
   }
 
+  Future<void> _vouchToggle(String reportId) async {
+    if (_vouchingIds.contains(reportId)) return;
+    final index = _liveItems.indexWhere((it) => it.id == reportId);
+    if (index < 0) return;
+    final item = _liveItems[index];
+    final token = widget.accessToken;
+
+    // Optimistic update
+    final optimistic = item.copyWith(
+      userVouched: !item.userVouched,
+      vouchCount: item.userVouched
+          ? (item.vouchCount - 1).clamp(0, 9999)
+          : item.vouchCount + 1,
+    );
+    setState(() {
+      _vouchingIds.add(reportId);
+      _liveItems[index] = optimistic;
+    });
+
+    try {
+      if (item.userVouched) {
+        await _api.unvouchReport(accessToken: token, reportId: reportId);
+      } else {
+        await _api.vouchReport(accessToken: token, reportId: reportId);
+      }
+    } catch (_) {
+      // Revert on failure
+      if (mounted) {
+        final rollbackIndex = _liveItems.indexWhere((it) => it.id == reportId);
+        if (rollbackIndex >= 0) {
+          setState(() => _liveItems[rollbackIndex] = item);
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _vouchingIds.remove(reportId));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final language = AppLanguageScope.of(context).language;
@@ -718,9 +762,10 @@ class _ReportsTabState extends State<ReportsTab> {
                     ),
                   ),
                 ),
-              ...visibleItems.map(
-                (item) => _buildReportCard(
-                  item: item,
+              ...visibleItems.indexed.map(
+                ((int, _ReportItem) entry) => _buildReportCard(
+                  index: entry.$1,
+                  item: entry.$2,
                   cardBg: cardBg,
                   border: border,
                   titleColor: titleColor,
@@ -971,6 +1016,7 @@ class _ReportsTabState extends State<ReportsTab> {
   }
 
   Widget _buildReportCard({
+    required int index,
     required _ReportItem item,
     required Color cardBg,
     required Color border,
@@ -1058,7 +1104,113 @@ class _ReportsTabState extends State<ReportsTab> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    _buildStatusBadge(item.status, isDark),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        _buildStatusBadge(item.status, isDark),
+                        if (item.vulnerablePerson)
+                          _buildChip(
+                            icon: Icons.warning_amber_rounded,
+                            label: 'Needs Help',
+                            fg: isDark
+                                ? const Color(0xFFFCA5A5)
+                                : Colors.red.shade700,
+                            bg: isDark
+                                ? const Color(0xFF3E1D1D)
+                                : Colors.red.shade50,
+                          ),
+                        if (item.confidenceScore != null)
+                          _buildChip(
+                            icon: Icons.smart_toy_outlined,
+                            label: _aiCredLabel(item.confidenceScore!),
+                            fg: _aiCredFg(item.confidenceScore!, isDark),
+                            bg: _aiCredBg(item.confidenceScore!, isDark),
+                          ),
+                        // ── Interactive vouch button ──
+                        if (item.id != null)
+                          GestureDetector(
+                            onTap: _vouchingIds.contains(item.id!)
+                                ? null
+                                : () => _vouchToggle(item.id!),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: item.userVouched
+                                    ? (isDark
+                                          ? const Color(0xFF1E3A5F)
+                                          : Colors.blue.shade50)
+                                    : (isDark
+                                          ? const Color(0xFF1B251B)
+                                          : const Color(0xFFF1F5F9)),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: item.userVouched
+                                      ? (isDark
+                                            ? const Color(0xFF3B82F6)
+                                            : Colors.blue.shade300)
+                                      : (isDark
+                                            ? const Color(0xFF334236)
+                                            : const Color(0xFFCBD5E1)),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _vouchingIds.contains(item.id!)
+                                      ? SizedBox(
+                                          width: 12,
+                                          height: 12,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 1.8,
+                                            color: item.userVouched
+                                                ? (isDark
+                                                      ? const Color(0xFF93C5FD)
+                                                      : Colors.blue.shade700)
+                                                : (isDark
+                                                      ? const Color(0xFF9AA79B)
+                                                      : Colors.grey.shade500),
+                                          ),
+                                        )
+                                      : Icon(
+                                          item.userVouched
+                                              ? Icons.thumb_up_alt
+                                              : Icons.thumb_up_alt_outlined,
+                                          size: 12,
+                                          color: item.userVouched
+                                              ? (isDark
+                                                    ? const Color(0xFF93C5FD)
+                                                    : Colors.blue.shade700)
+                                              : (isDark
+                                                    ? const Color(0xFF9AA79B)
+                                                    : Colors.grey.shade500),
+                                        ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    item.vouchCount > 0
+                                        ? '${item.vouchCount} Vouch'
+                                        : 'Vouch',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: item.userVouched
+                                          ? (isDark
+                                                ? const Color(0xFF93C5FD)
+                                                : Colors.blue.shade700)
+                                          : (isDark
+                                                ? const Color(0xFF9AA79B)
+                                                : Colors.grey.shade600),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -1067,6 +1219,58 @@ class _ReportsTabState extends State<ReportsTab> {
         ],
       ),
     );
+  }
+
+  Widget _buildChip({
+    required IconData icon,
+    required String label,
+    required Color fg,
+    required Color bg,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: fg),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              color: fg,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _aiCredLabel(double score) {
+    if (score >= 0.75) return 'AI: High';
+    if (score >= 0.50) return 'AI: Medium';
+    return 'AI: Low';
+  }
+
+  Color _aiCredFg(double score, bool isDark) {
+    if (score >= 0.75)
+      return isDark ? const Color(0xFF86EFAC) : Colors.green.shade700;
+    if (score >= 0.50)
+      return isDark ? const Color(0xFFFCD34D) : Colors.amber.shade700;
+    return isDark ? const Color(0xFFFCA5A5) : Colors.red.shade700;
+  }
+
+  Color _aiCredBg(double score, bool isDark) {
+    if (score >= 0.75)
+      return isDark ? const Color(0xFF14532D) : Colors.green.shade50;
+    if (score >= 0.50)
+      return isDark ? const Color(0xFF373018) : Colors.amber.shade50;
+    return isDark ? const Color(0xFF3E1D1D) : Colors.red.shade50;
   }
 
   Widget _buildStatusBadge(String status, bool isDark) {
@@ -1851,6 +2055,8 @@ class _ReportItem {
     this.imageUrl,
     this.userVouched = false,
     this.vouchCount = 0,
+    this.confidenceScore,
+    this.vulnerablePerson = false,
   });
 
   final String? id;
@@ -1872,6 +2078,8 @@ class _ReportItem {
   final String? imageUrl;
   final bool userVouched;
   final int vouchCount;
+  final double? confidenceScore;
+  final bool vulnerablePerson;
 
   _ReportItem copyWith({
     String? id,
@@ -1893,6 +2101,8 @@ class _ReportItem {
     String? imageUrl,
     bool? userVouched,
     int? vouchCount,
+    double? confidenceScore,
+    bool? vulnerablePerson,
   }) {
     return _ReportItem(
       id: id ?? this.id,
@@ -1914,6 +2124,8 @@ class _ReportItem {
       imageUrl: imageUrl ?? this.imageUrl,
       userVouched: userVouched ?? this.userVouched,
       vouchCount: vouchCount ?? this.vouchCount,
+      confidenceScore: confidenceScore ?? this.confidenceScore,
+      vulnerablePerson: vulnerablePerson ?? this.vulnerablePerson,
     );
   }
 }

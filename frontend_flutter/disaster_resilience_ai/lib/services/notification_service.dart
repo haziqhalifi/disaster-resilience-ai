@@ -153,6 +153,14 @@ class NotificationService {
 
       _recentWarnings = newWarnings;
 
+      // Persist the timestamp BEFORE processing alerts so that if the app
+      // is killed while an alert is on screen, the same warnings are not
+      // re-triggered on the next launch.
+      await prefs.setString(
+        _lastCheckKey,
+        DateTime.now().toUtc().toIso8601String(),
+      );
+
       for (final warning in newWarnings) {
         final isHighSeverity =
             warning.alertLevel == AlertLevel.warning ||
@@ -165,12 +173,6 @@ class NotificationService {
         // Always also post a system notification (visible in tray)
         if (!kIsWeb) await _showNotification(warning);
       }
-
-      // Persist the current time as last-checked.
-      await prefs.setString(
-        _lastCheckKey,
-        DateTime.now().toUtc().toIso8601String(),
-      );
     } catch (e) {
       debugPrint('NotificationService poll error: $e');
     } finally {

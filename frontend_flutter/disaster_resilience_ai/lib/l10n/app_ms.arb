@@ -22,5 +22,7 @@
   },
   "mapHazardFlood": "Banjir",
   "mapHazardLandslide": "Tanah Runtuh",
-  "mapHazardGeneric": "Bahaya"
+  "mapHazardGeneric": "Bahaya",
+  "mapFilterAll": "Semua",
+  "mapLegendCommunityReports": "Laporan Komuniti"
 }
