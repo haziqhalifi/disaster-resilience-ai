@@ -34,3 +34,10 @@ NADMA_DISASTERS_API_TOKEN: str = os.getenv(
 	"NADMA_DISASTERS_API_TOKEN",
 	"6571756|yN5L6StiHQOlyouD5FjmMFBOeywAxjPE79x0m7n843ac4e63",
 )
+
+# ── OpenAI Assistant Chatbot ────────────────────────────────────────────────
+OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+OPENAI_ASSISTANT_ID: str = os.getenv(
+	"OPENAI_ASSISTANT_ID",
+	"asst_z53ZlGOoHh76CDfqcBA0t4gC",
+)

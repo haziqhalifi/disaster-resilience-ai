@@ -85,6 +85,26 @@ class ApiService {
     throw Exception('Prediction failed with status ${response.statusCode}');
   }
 
+  /// Send a chatbot message to the backend OpenAI Assistant proxy.
+  Future<Map<String, dynamic>> sendAssistantMessage({
+    required String message,
+    String? threadId,
+  }) async {
+    final response = await _postWithNetworkHandling(
+      Uri.parse('$baseUrl/api/v1/chat/assistant'),
+      body: {
+        'message': message,
+        if (threadId != null && threadId.isNotEmpty) 'thread_id': threadId,
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    throw Exception(_extractErrorMessage(response));
+  }
+
   Future<AuthResult> signUp({
     required String username,
     required String email,

@@ -1331,12 +1331,12 @@ class _HomePageState extends State<HomePage> {
       case 0:
         return _buildDashboard();
       case 1:
+        return MapTab(accessToken: widget.accessToken);
+      case 2:
         return NotificationsTab(
           accessToken: widget.accessToken,
           warnings: _allActiveWarnings,
         );
-      case 2:
-        return MapTab(accessToken: widget.accessToken);
       case 3:
         return ProfileTab(
           accessToken: widget.accessToken,
@@ -1369,9 +1369,9 @@ class _HomePageState extends State<HomePage> {
     String title;
     switch (_selectedIndex) {
       case 1:
-        title = _tr(en: 'Notifications', ms: 'Notifikasi', zh: '通知');
-      case 2:
         title = _tr(en: 'Map', ms: 'Peta', zh: '地图');
+      case 2:
+        title = _tr(en: 'Notifications', ms: 'Notifikasi', zh: '通知');
       case 3:
         title = _tr(en: 'Profile', ms: 'Profil', zh: '个人');
       case 4:
@@ -1558,14 +1558,14 @@ class _HomePageState extends State<HomePage> {
               selectedIcon: Icons.home,
             ),
             _buildNavDestination(
-              label: _tr(en: 'Notifications', ms: 'Notifikasi', zh: '通知'),
-              icon: Icons.notifications_none_rounded,
-              selectedIcon: Icons.notifications_rounded,
-            ),
-            _buildNavDestination(
               label: _tr(en: 'Map', ms: 'Peta', zh: '地图'),
               icon: Icons.map_outlined,
               selectedIcon: Icons.map,
+            ),
+            _buildNavDestination(
+              label: _tr(en: 'Notifications', ms: 'Notifikasi', zh: '通知'),
+              icon: Icons.notifications_none_rounded,
+              selectedIcon: Icons.notifications_rounded,
             ),
             _buildNavDestination(
               label: _tr(en: 'Profile', ms: 'Profil', zh: '个人'),

@@ -214,6 +214,15 @@ class _ProfileTabState extends State<ProfileTab> {
         final checkColor = isDark
             ? const Color(0xFFD1D5DB)
             : const Color(0xFF475569);
+        final comingSoonBg = isDark
+            ? const Color(0xFF1B251B)
+            : const Color(0xFFF8FAFC);
+        final comingSoonBorder = isDark
+            ? const Color(0xFF334236)
+            : const Color(0xFFE2E8F0);
+        final comingSoonTitle = isDark
+            ? const Color(0xFFE5E7EB)
+            : const Color(0xFF0F172A);
         return SafeArea(
           child: ListView(
             shrinkWrap: true,
@@ -241,6 +250,42 @@ class _ProfileTabState extends State<ProfileTab> {
                   onTap: () => Navigator.pop(context, lang),
                 );
               }),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: comingSoonBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: comingSoonBorder),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tr(
+                          en: 'ASEAN native languages support coming soon',
+                          ms: 'Sokongan bahasa asli ASEAN akan datang',
+                          zh: '东盟本地语言支持即将推出',
+                        ),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: comingSoonTitle,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        tr(
+                          en: 'Thai, Vietnamese, Filipino (Tagalog), Khmer, Lao, Burmese, and more.',
+                          ms: 'Bahasa Thai, Vietnam, Filipina (Tagalog), Khmer, Lao, Burma dan lain-lain.',
+                          zh: '泰语、越南语、菲律宾语（他加禄语）、高棉语、老挝语、缅甸语等。',
+                        ),
+                        style: TextStyle(color: subtitleColor, height: 1.35),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: 8),
             ],
           ),
